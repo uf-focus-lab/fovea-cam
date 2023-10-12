@@ -1,0 +1,10 @@
+# Build results
+.cache
+build
+debug
+# VSCode configurations
+.vscode
+# Python cache
+__pycache__
+# Local documents should be added manually upon need
+docs
