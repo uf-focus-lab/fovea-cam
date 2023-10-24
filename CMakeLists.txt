@@ -38,10 +38,6 @@ foreach(SRC ${SOURCES})
     get_filename_component(TARGET ${SRC} NAME_WE)
     # Add target executable
     add_executable(${TARGET} ${SRC} ${LIB_INCS} ${LIB_SRCS})
-    # Add compile options
-    # target_compile_definitions(${TARGET}
-    #   ${LibDRM_DEFINITIONS}
-    # )
     # Link with libraries
     target_link_libraries(${TARGET}
       Threads::Threads

@@ -19,6 +19,7 @@ private:
   void clear_buffer();
 
 public:
+  ~Pipe() { close(); }
   void close();
   void write(const T &value);
   T read();
@@ -59,7 +60,6 @@ template <typename T> T Pipe<T>::read() {
     cond_next.wait(lock);
   } while (1);
   T value = *buffer;
-  clear_buffer();
   lock.unlock();
   return value;
 }

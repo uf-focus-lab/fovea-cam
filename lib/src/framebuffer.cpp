@@ -61,9 +61,10 @@ void FrameBuffer::buffer_init() {
 
 void FrameBuffer::buffer_free() {
   // blank screen
-  memset(framebuffer, 0, viewport_bytes);
+  // memset(framebuffer, 0, viewport_bytes);
   // release mapped memory
-  munmap((void *)framebuffer, viewport_bytes);
+  if (framebuffer != nullptr)
+    munmap((void *)framebuffer, viewport_bytes);
 }
 
 FrameBuffer::FrameBuffer(std::string path) {
