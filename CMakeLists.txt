@@ -7,21 +7,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_MODULE_PATH ${PROJECT_ROOT}/cmake)
+set(CMAKE_MODULE_PATH ${PROJECT_ROOT}/scripts)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# optimization flags specific to jetson nano
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -march=armv8-a -mcpu=cortex-a57")
 # Dependency Resolution
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Spinnaker REQUIRED)
-find_package(CppLinuxSerial REQUIRED)
-# Project Local Library
-file(GLOB LIB_INCS lib/inc/*.hpp)
-file(GLOB LIB_SRCS lib/src/*.cpp)
+# fetch latest argparse
+include(FetchContent)
+FetchContent_Declare(
+    argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+)
+FetchContent_MakeAvailable(argparse)
+add_compile_definitions(ARGPARSE_BUILD_TESTS=off)
+add_compile_definitions(ARGPARSE_BUILD_SAMPLES=off)
+set_target_properties(
+  ARGPARSE_TESTS
+  PROPERTIES
+  EXCLUDE_FROM_ALL 1
+)
 # header files and libraries
 include_directories(
-  ${PROJECT_ROOT}/lib/inc/
+  ${PROJECT_ROOT}/include/
+  ${PROJECT_ROOT}/lib/
   ${Spinnaker_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -30,19 +43,16 @@ link_directories(
   ${Spinnaker_LIB_DIRS}
   ${OpenCV_LIB_DIRS}
 )
+# Project Local Library
+file(GLOB LIB_SRCS lib/*/*.cpp)
 # Get all the cpp files in the src directory
-file(GLOB SOURCES src/*.cpp)
-# For each source file, create an executable and link with the library
-foreach(SRC ${SOURCES})
-    # Get filename without extension as target name
-    get_filename_component(TARGET ${SRC} NAME_WE)
-    # Add target executable
-    add_executable(${TARGET} ${SRC} ${LIB_INCS} ${LIB_SRCS})
-    # Link with libraries
-    target_link_libraries(${TARGET}
-      Threads::Threads
-      ${OpenCV_LIBS}
-      ${Spinnaker_LIBRARIES}
-      CppLinuxSerial::CppLinuxSerial
-    )
-endforeach()
+file(GLOB sources src/*.cpp)
+# Compile to binary
+add_executable(${PROJECT_NAME} ${sources} ${LIB_SRCS})
+# Link with libraries
+target_link_libraries(${PROJECT_NAME}
+  Threads::Threads
+  ${OpenCV_LIBS}
+  ${Spinnaker_LIBRARIES}
+  argparse
+)

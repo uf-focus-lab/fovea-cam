@@ -1,4 +1,4 @@
-#include "spinnaker.hpp"
+#include "spinnaker.h"
 #include <iostream>
 
 #define MAP_PX_FMT(FMT_SP, FMT_CV, CONVERT_FROM)                               \

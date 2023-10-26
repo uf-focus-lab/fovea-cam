@@ -1,4 +1,4 @@
-#include "canvas.hpp"
+#include "canvas.h"
 #include <algorithm>
 #include <cstring>
 #include <iostream>

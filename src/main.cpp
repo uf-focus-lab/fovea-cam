@@ -1,80 +1,146 @@
-#include "canvas.hpp"
-#include "vtconsole.hpp"
+#include "graphics/canvas.h"
+#include "util/flushing_pipe.h"
+#include "util/spinnaker.h"
+#include "util/vtconsole.h"
 #include <chrono>
-#include <cstdlib>
 #include <iostream>
-#include <opencv2/core/types.hpp>
-#include <string>
-#include <unistd.h>
+#include <opencv2/opencv.hpp>
+#include <ratio>
+#include <signal.h>
+#include <thread>
+// Create pipes
+FlushingPipe::Pipe<cv::Mat> img_pipe[3] = {FlushingPipe::Pipe<cv::Mat>(),
+                                           FlushingPipe::Pipe<cv::Mat>()};
 
-namespace Color {
-const cv::Scalar black(0, 0, 0, 0), white(255, 255, 255, 0), blue(255, 0, 0, 0),
-    green(0, 255, 0, 0), red(0, 0, 255, 0);
+void close_all_pipes(int) {
+  std::cout << std::endl;
+  img_pipe[0].close();
+  img_pipe[1].close();
+  img_pipe[2].close();
 }
 
-void draw(canvas::Canvas &canvas) {
-  const auto shape = canvas.shape();
-  struct {
-    double draw = 0, paint = 0;
-  } duration;
-  size_t count = 0;
-  for (int i = 0; (i < (int)shape.h) && (i < (int)shape.w); i += 5) {
-    auto start = std::chrono::system_clock::now();
-    canvas.clear(Color::blue);
-    cv::rectangle(canvas.Mat(), {i, i}, {i + 100, i + 100}, Color::red,
-                  cv::FILLED);
-    auto check_a = std::chrono::system_clock::now();
-    canvas.show();
-    auto check_b = std::chrono::system_clock::now();
-    duration.draw += std::chrono::duration<double>(check_a - start).count();
-    duration.paint += std::chrono::duration<double>(check_b - check_a).count();
-    double time = std::chrono::duration<double>(check_b - start).count();
-    if (time < 0.033) {
-      usleep(33000 - (int)(time * 1000000));
-    }
-    count++;
+void capture_thread(Spinnaker::CameraPtr camera,
+                    FlushingPipe::Pipe<cv::Mat> &img_pipe) {
+  try {
+    camera->Init();
+    camera->BeginAcquisition();
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    img_pipe.close();
+    return;
   }
-  duration.draw /= count;
-  duration.paint /= count;
-  auto total = duration.draw + duration.paint;
-  std::cout << std::endl
-            << "framerate: " << 1 / total << " fps" << std::endl
-            << "  > draw : " << 1000 * duration.draw << "ms\t"
-            << duration.draw / total * 100 << "%" << std::endl
-            << "  > paint: " << 1000 * duration.paint << "ms\t"
-            << duration.paint / total * 100 << "%" << std::endl
-            << std::endl;
-  // std::string line;
-  // std::getline(std::cin, line);
-  // usleep(800000);
+  // Capture loop
+  while (1) {
+    auto const image = Spinnaker::fromImagePtr(camera->GetNextImage());
+    try {
+      img_pipe.write(image);
+    } catch (FlushingPipe::PipeEnd &e) {
+      break;
+    }
+  }
+  // Release camera instance
+  try {
+    camera->EndAcquisition();
+    camera->DeInit();
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+  }
+  std::cout << "[capture_thread] terminated." << std::endl;
 }
 
-int main(int argc, char *argv[]) {
-  // if (argc < 2) {
-  //   printf("Usage: %s <fb path>\n", argv[0]);
-  //   throw;
-  // }
-  // Unbind all vtconsole from frame buffer
+void stack_thread(FlushingPipe::Pipe<cv::Mat> &img_pipe_in,
+                  FlushingPipe::Pipe<cv::Mat> &img_pipe_out, const size_t n) {
+  size_t counter = 0;
+  cv::Mat stack;
+  while (1) {
+    try {
+      auto image = img_pipe_in.read();
+      if (counter == 0) {
+        image.convertTo(stack, CV_32FC4);
+      } else {
+        cv::add(stack, image, stack, cv::noArray(), CV_32FC4);
+      }
+      if (++counter >= n) {
+        cv::Mat result(stack.size(), CV_8UC4);
+        double minVal, maxVal;
+        cv::minMaxLoc(stack, &minVal, &maxVal, NULL, NULL);
+        stack -= minVal;
+        cv::convertScaleAbs(stack, result, 255.0 / (maxVal - minVal));
+        img_pipe_out.write(std::move(result));
+        counter = 0;
+      }
+    } catch (FlushingPipe::PipeEnd &e) {
+      break;
+    }
+  }
+  std::cout << "[stack_thread] terminated." << std::endl;
+}
+
+void display_thread(FlushingPipe::Pipe<cv::Mat> img_pipe[2]) {
   vtconsole::unbind_all();
-  // Create canvas for given framebuffer
-  canvas::Canvas canvas(argc > 2 ? argv[1] : "/dev/fb0");
-  // Draw something
-  std::cout << "transform::NONE" << std::endl;
-  canvas.set_transform(canvas::transform::NONE);
-  draw(canvas);
+  canvas::Canvas canvas("/dev/fb0", canvas::transform::NONE);
+  canvas.clear();
+  auto splash = cv::imread("assets/splash.png", cv::IMREAD_UNCHANGED);
+  canvas.show(splash);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  canvas.clear();
+  // Prepare display areas
+  // const unsigned int w = canvas.shape().w / 2, h = canvas.shape().h;
+  // cv::Rect display_tile[2] = {cv::Rect(50, 50, w - 100, h - 100),
+  //                             cv::Rect(w + 50, 50, w - 100, h - 100)};
+  const unsigned int w = canvas.shape().w, h = canvas.shape().h / 2;
+  cv::Rect display_tile[2] = {cv::Rect(50, 50, w - 100, h - 100),
+                              cv::Rect(50, h + 50, w - 100, h - 100)};
+  while (1) {
+    try {
+      for (unsigned i = 0; i < 2; i++) {
+        cv::Mat image;
+        cv::flip(img_pipe[i].read(), image, 1);
+        canvas.show(image, display_tile[i]);
+      }
+    } catch (FlushingPipe::PipeEnd &e) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  // Wait until other threads terminate
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  // Restore splash screen
+  canvas.clear();
+  canvas.show(splash);
+  std::cout << "[display_thread] terminated." << std::endl;
+}
 
-  std::cout << "transform::ROTATE_90" << std::endl;
-  canvas.set_transform(canvas::transform::ROTATE_90);
-  draw(canvas);
-
-  std::cout << "transform::ROTATE_180" << std::endl;
-  canvas.set_transform(canvas::transform::ROTATE_180);
-  draw(canvas);
-
-  std::cout << "transform::ROTATE_270" << std::endl;
-  canvas.set_transform(canvas::transform::ROTATE_270);
-  draw(canvas);
-
-  // fb.render(canvas::rect{.a = p[3][0], .b = p[5][2]}, Color::black);
+int main() {
+  // Register signal handler
+  signal(SIGINT, close_all_pipes);
+  signal(SIGKILL, close_all_pipes);
+  signal(SIGTERM, close_all_pipes);
+  // Initialize cameras
+  auto spinnaker = Spinnaker::System::GetInstance();
+  auto camList = spinnaker->GetCameras();
+  if (camList.GetSize() < 2) {
+    std::cerr << "No enough cameras (" << camList.GetSize()
+              << " cameras found)." << std::endl;
+    camList.Clear();
+    spinnaker->ReleaseInstance();
+    return -1;
+  }
+  // Begin acquisition
+  std::thread display(display_thread, img_pipe);
+  std::thread capture_0(
+      [&]() { capture_thread(camList.GetByIndex(0), img_pipe[0]); });
+  std::thread capture_1(
+      [&]() { capture_thread(camList.GetByIndex(1), img_pipe[1]); });
+  // std::thread stack_1([&]() { stack_thread(img_pipe[2], img_pipe[1], 32); });
+  // Wait for threads to terminate
+  display.join();
+  capture_0.join();
+  capture_1.join();
+  // stack_1.join();
+  // Release resources
+  camList.Clear();
+  spinnaker->ReleaseInstance();
+  std::cout << "[main] terminated." << std::endl;
   return 0;
 }

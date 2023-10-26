@@ -1,4 +1,4 @@
-#include "framebuffer.hpp"
+#include "framebuffer.h"
 #include <opencv2/opencv.hpp>
 #include <stdint.h>
 #include <string>
