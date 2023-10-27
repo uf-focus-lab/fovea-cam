@@ -4,7 +4,7 @@ build
 bin
 debug
 # VSCode configurations
-.vscode
+# .vscode
 # Python cache
 __pycache__
 # Local documents should be added manually upon need
