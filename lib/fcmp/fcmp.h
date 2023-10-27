@@ -10,9 +10,8 @@
 
 #include <stdint.h>
 
-// 5~8 bit of frame header
-enum fcmp_frame_type {
-  // Mask for all methods
+enum fcmp_header {
+  // 5~8 bit of frame header
   FCMP_METHOD = 0xF0,
   // Frame is meaningless, will be discarded
   FCMP_METHOD_NOP = 0x00,
@@ -24,10 +23,9 @@ enum fcmp_frame_type {
   FCMP_METHOD_REJ = 0x40,
   // Log messages for debugging purposes
   // The body of the frame will be a variable length string
-  FCMP_METHOD_LOG = 0xF0
-};
-// 0~4 bit of frame header
-enum fcmp_field_type {
+  FCMP_METHOD_LOG = 0xF0,
+
+  // 0~4 bit of frame header
   FCMP_FIELD = 0x0F,
   // Variable length payload, or empty.
   FCMP_FIELD_ANY = 0x00,

@@ -1,6 +1,7 @@
 # Build results
 .cache
 build
+bin
 debug
 # VSCode configurations
 .vscode

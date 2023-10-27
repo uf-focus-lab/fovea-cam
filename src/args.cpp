@@ -6,7 +6,7 @@ argparse::ArgumentParser parser("FoveaCam");
 
 namespace args {
 
-void parse(int argc, char *const argv[]) {
+void parse(int argc, const char *const argv[]) {
 
   parser.add_argument("action").default_value("view").help(
       "display the square of a given integer");

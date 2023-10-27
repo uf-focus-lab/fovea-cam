@@ -12,6 +12,6 @@ std::string mems_serial;
 
 std::string lens_serial;
 
-void parse(int argc, char *const argv[]);
+void parse(int argc, const char *const argv[]);
 
 }

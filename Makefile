@@ -1,21 +1,30 @@
 # This is a heper Makefile for CMake Project
-DEPS := $(wildcard src/*.cpp)
-DEPS += $(wildcard lib/inc/*.h)
-DEPS += $(wildcard lib/src/*.cpp)
+DEPS := $(wildcard **/*.cpp)
+DEPS += $(wildcard **/*.h)
+DEPS += $(wildcard **/*.hpp)
+# Make without output
+MAKE := make --no-print-directory
+# CMake Build Directory and Build Type
+CMAKE_BUILD_TYPE ?= Unknown
 
-release: CMakeLists.txt src/*.cpp $(DEPS)
-	@ mkdir -p build
-	@ cd build \
-		&& cmake -DCMAKE_BUILD_TYPE=Release .. \
-		&& cmake --build .
+release: CMAKE_BUILD_TYPE := Release
+debug: CMAKE_BUILD_TYPE := Debug
 
-debug: CMakeLists.txt src/*.cpp $(DEPS)
-	@ mkdir -p debug
-	@ cd debug \
-		&& cmake -DCMAKE_BUILD_TYPE=Debug .. \
-		&& cmake --build .
+release debug:
+	$(eval BUILD_DIR := bin/$@/)
+	@ $(MAKE) $(BUILD_DIR)/Makefile CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+	@ cd $(BUILD_DIR) && $(MAKE) && ln -sf ./FoveaCam ../
+	@ cd $(BUILD_DIR)/.. \
+		&& ln -sf $@/compile_commands.json . \
+		&& ln -sf $@/FoveaCam .
+
+%/Makefile: CMakeLists.txt
+	$(eval BUILD_DIR := $(shell dirname $@))
+	@ echo "Generating CMake Files For $*"
+	@ mkdir -p $(BUILD_DIR)
+	@ cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) $(PWD)
 
 clean:
-	@ rm -rf build debug
+	@ rm -rf bin
 
-.PHONY: release debug run clean
+.PHONY: release debug clean
