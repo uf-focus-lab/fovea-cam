@@ -1,4 +1,7 @@
 #include "spinnaker.h"
+
+#include "util/assert.h"
+
 #include <iostream>
 
 #define MAP_PX_FMT(FMT_SP, FMT_CV, CONVERT_FROM)                               \
@@ -9,7 +12,7 @@ typedef struct {
   int type, cvt;
 } PixFormatLUT;
 
-PixFormatLUT convertPixelFormat(Spinnaker::ImagePtr image_ptr) {
+PixFormatLUT convertPixelFormat(Spinnaker::ImagePtr &image_ptr) {
   const auto fmt = image_ptr->GetPixelFormat();
   switch (fmt) {
     MAP_PX_FMT(Mono8, 8UC1, GRAY);
@@ -37,6 +40,7 @@ PixFormatLUT convertPixelFormat(Spinnaker::ImagePtr image_ptr) {
   }
   return {.type = -1, .cvt = -1};
 }
+
 namespace Spinnaker {
 
 cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
@@ -56,6 +60,52 @@ cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
     mat = tmp;
   }
   return mat;
+}
+
+#define CHECK(NODE_PTR)                                                        \
+  ASSERT(NODE_PTR.IsValid(), "invalid node name");                             \
+  ASSERT(GenApi::IsAvailable(NODE_PTR), "node not available");                 \
+  ASSERT(GenApi::IsWritable(NODE_PTR), "node not writable");
+
+#define CATCH(NAME, KEY, VALUE)                                                \
+  catch (std::exception & e) {                                                 \
+    std::cerr << "[Spinnaker::config] Warning: unable to set <" NAME "> "      \
+              << KEY << " = " << VALUE << " (" << e.what() << ")"            \
+              << std::endl;                                                    \
+  }
+
+void config(GenApi::INodeMap &node_map, const char *key, const char *value) {
+  try {
+    const auto node = node_map.GetNode(key);
+    const auto view = GenApi::CEnumerationPtr(node);
+    CHECK(view);
+    const auto entry = view->GetEntryByName(value);
+    ASSERT(GenApi::IsAvailable(entry), "enum entry not available");
+    ASSERT(GenApi::IsReadable(entry), "enum entry not readable");
+    const auto enum_value = entry->GetValue();
+    view->SetIntValue(enum_value);
+  }
+  CATCH("enum", key, value);
+}
+
+void config(GenApi::INodeMap &node_map, const char *key, const int value) {
+  try {
+    const auto node = node_map.GetNode(key);
+    const auto view = GenApi::CIntegerPtr(node);
+    CHECK(view);
+    view->SetValue(value);
+  }
+  CATCH("int", key, value);
+}
+
+void config(GenApi::INodeMap &node_map, const char *key, const double value) {
+  try {
+    const auto node = node_map.GetNode(key);
+    const auto view = GenApi::CFloatPtr(node);
+    CHECK(view);
+    view->SetValue(value);
+  }
+  CATCH("float", key, value);
 }
 
 }; // namespace Spinnaker

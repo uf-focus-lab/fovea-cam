@@ -10,9 +10,12 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_MODULE_PATH ${PROJECT_ROOT}/scripts)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-# optimization flags specific to jetson nano
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -march=armv8-a -mcpu=cortex-a57")
+# set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# Optimization Flags Specific to Jetson Nano
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -Ofast -march=armv8-a -mcpu=cortex-a57")
+# Pkg Config
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(libusb-1.0 REQUIRED libusb-1.0)
 # Dependency Resolution
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
@@ -51,6 +54,7 @@ file(GLOB sources src/*.cpp)
 add_executable(${PROJECT_NAME} ${sources} ${LIB_SRCS})
 # Link with libraries
 target_link_libraries(${PROJECT_NAME}
+  ${libusb-1.0_LIBRARIES}
   Threads::Threads
   ${OpenCV_LIBS}
   ${Spinnaker_LIBRARIES}

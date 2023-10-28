@@ -18,7 +18,7 @@ release debug:
 		&& ln -sf $@/compile_commands.json . \
 		&& ln -sf $@/FoveaCam .
 
-%/Makefile: CMakeLists.txt
+bin/%/Makefile: CMakeLists.txt
 	$(eval BUILD_DIR := $(shell dirname $@))
 	@ echo "Generating CMake Files For $*"
 	@ mkdir -p $(BUILD_DIR)

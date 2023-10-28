@@ -74,7 +74,9 @@ void mems(std::string const &serial_port,
   // Check for serial error
   if (fd < 0) {
     std::cerr << "Error opening serial port " << serial_port << std::endl;
-    std::exit(-1);
+    pos_in.close();
+    pos_out.close();
+    return;
   }
   // FCMP Field Buffer
   static fcmp_field_pos fcmp_position = {0};

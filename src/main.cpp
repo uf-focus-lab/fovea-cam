@@ -47,6 +47,9 @@ int main() {
   // Stack Thread
   // thread_list.push_back(
   //     std::thread([&]() { thread::stack(img_pipe[2], img_pipe[1], 8); }));
+  // MEMS Thread
+  // thread_list.push_back(
+  //     std::thread([&]() { thread::mems(std::string{"/dev/ttyACM"}); }));
   // Wait for threads to terminate
   for (auto &thread : thread_list) {
     thread.join();
