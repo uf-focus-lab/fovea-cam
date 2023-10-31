@@ -14,7 +14,8 @@
 #include <signal.h>
 #include <thread>
 // Create pipes
-Threading::FlushingPipe<cv::Mat> img_pipe[3];
+Threading::FlushingPipe<cv::Mat> wide_view_pipe;
+std::vector<Threading::FlushingPipe<cv::Mat> *> fovea_pipes;
 Threading::FIFO<context::mems_position> pos_in(1);
 Threading::FlushingPipe<context::mems_position> pos_out;
 
@@ -30,8 +31,9 @@ bool flag_exit = false;
 void close_all_pipes(int) {
   std::cout << std::endl;
   flag_exit = true;
-  for (unsigned i = 0; i < sizeof(img_pipe) / sizeof(*img_pipe); i++) {
-    NO_THROW(img_pipe[i].close());
+  NO_THROW(wide_view_pipe.close());
+  for (auto &pipe : fovea_pipes) {
+    NO_THROW(pipe->close());
   }
   NO_THROW(pos_in.close());
   NO_THROW(pos_out.close());
@@ -51,23 +53,38 @@ int main() {
   // Initialize cameras
   auto spinnaker = Spinnaker::System::GetInstance();
   auto camList = spinnaker->GetCameras();
-  if (camList.GetSize() < 2) {
-    std::cerr << "No enough cameras (" << camList.GetSize()
-              << " cameras found)." << std::endl;
+  Spinnaker::CameraPtr wide_camera(nullptr), fovea_camera(nullptr);
+  for (unsigned idx = 0; idx < camList.GetSize(); idx++) {
+    auto camera = camList[idx];
+    const auto model = std::string(camera->DeviceModelName().c_str());
+    if (model.ends_with("BFS-U3-16S2C")) {
+      // wide angle camera
+      wide_camera = camera;
+    } else if (model.ends_with("BFS-U3-16S2C-BD")) {
+      // fovea camera
+      fovea_camera = camera;
+    }
+  }
+  if (wide_camera == nullptr || fovea_camera == nullptr) {
+    std::cerr << "[main] Unable to find cameras." << std::endl;
     camList.Clear();
     spinnaker->ReleaseInstance();
     return -1;
+  }
+  // Multiplex 4 streams
+  for (unsigned i = 0; i < 4; i++) {
+    fovea_pipes.push_back(new Threading::FlushingPipe<cv::Mat>());
   }
   // Begin acquisition
   std::vector<std::thread> thread_list;
   // Display Thread
   thread_list.push_back(
-      std::thread([&]() { thread::display(img_pipe[0], img_pipe[1]); }));
+      std::thread([&]() { thread::display(wide_view_pipe, fovea_pipes); }));
   // Capture Threads
   thread_list.push_back(
-      std::thread([&]() { thread::capture(camList[0], img_pipe[0]); }));
+      std::thread([&]() { thread::capture(wide_camera, wide_view_pipe); }));
   thread_list.push_back(
-      std::thread([&]() { thread::capture(camList[1], img_pipe[1]); }));
+      std::thread([&]() { thread::capture(fovea_camera, fovea_pipes); }));
   // Stack Thread
   // thread_list.push_back(
   //     std::thread([&]() { thread::stack(img_pipe[2], img_pipe[1], 8); }));

@@ -5,6 +5,8 @@
 #include "usb/serial_device.h"
 #include "util/spinnaker.h"
 
+#include <vector>
+
 extern bool flag_exit;
 
 namespace thread {
@@ -12,11 +14,14 @@ namespace thread {
 void capture(Spinnaker::CameraPtr camera,
              Threading::FlushingPipe<cv::Mat> &pipe_out);
 
+void capture(Spinnaker::CameraPtr camera,
+             std::vector<Threading::FlushingPipe<cv::Mat> *> pipes_out);
+
 void stack(Threading::FlushingPipe<cv::Mat> &pipe_in,
            Threading::FlushingPipe<cv::Mat> &pipe_out, const size_t n);
 
 void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
-             Threading::FlushingPipe<cv::Mat> &pipe_tile_b);
+             std::vector<Threading::FlushingPipe<cv::Mat> *> pipe_tile_b);
 
 void mems(USB::SerialDevice &device,
           Threading::FIFO<context::mems_position> &pos_in,

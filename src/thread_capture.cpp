@@ -50,6 +50,46 @@ void configure(Spinnaker::CameraPtr camera) {
 namespace thread {
 
 void capture(Spinnaker::CameraPtr camera,
+             std::vector<Threading::FlushingPipe<cv::Mat> *> pipes_out) {
+  try {
+    camera->Init();
+    configure(camera);
+    camera->BeginAcquisition();
+  } catch (std::exception &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    for (auto &pipe : pipes_out) {
+      pipe->close();
+    }
+    return;
+  }
+  // Capture loop
+  try {
+    while (1) {
+      for (auto &pipe : pipes_out) {
+        auto img_ptr = camera->GetNextImage();
+        // auto timestamp = img_ptr->GetTimeStamp();
+        pipe->write(Spinnaker::fromImagePtr(img_ptr));
+      }
+    }
+  } catch (Threading::Closed &e) {
+    // Normal termination
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << "Spinnaker Error: " << e.what() << std::endl;
+  } catch (...) {
+    std::cerr << "Unknown Error" << std::endl;
+  }
+  // Release camera instance
+  try {
+    camera->EndAcquisition();
+    camera->DeInit();
+    camera = nullptr;
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+  }
+  std::cout << "[Thread::capture] terminated." << std::endl;
+}
+
+void capture(Spinnaker::CameraPtr camera,
              Threading::FlushingPipe<cv::Mat> &pipe_out) {
   try {
     camera->Init();

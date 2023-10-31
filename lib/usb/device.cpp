@@ -42,7 +42,7 @@ std::vector<USB_Interface> Device::interfaces() {
 
   std::vector<USB_Interface> result;
   for (uint8_t i = 0; i < config->bNumInterfaces; i++) {
-    for (unsigned j = 0; j < config->interface[i].num_altsetting; j++) {
+    for (int j = 0; j < config->interface[i].num_altsetting; j++) {
       result.push_back(config->interface[i].altsetting[j]);
     }
   }

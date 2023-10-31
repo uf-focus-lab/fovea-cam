@@ -1,12 +1,20 @@
 #include "graphics/canvas.h"
 #include "threads.h"
+#include "util/assert.h"
 #include "util/vtconsole.h"
-#include <exception>
+#include <memory>
+
+void render(canvas::Canvas &canvas, std::shared_ptr<const cv::Mat> frame,
+            cv::Rect tile) {
+  cv::Mat tmp(frame->size(), frame->type());
+  cv::flip(*frame, tmp, 1);
+  canvas.show(tmp, tile);
+}
 
 namespace thread {
 
 void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
-             Threading::FlushingPipe<cv::Mat> &pipe_tile_b) {
+             std::vector<Threading::FlushingPipe<cv::Mat> *> pipe_tile_b) {
   try {
     vtconsole::unbind_all();
     canvas::Canvas canvas("/dev/fb0", canvas::transform::NONE);
@@ -15,33 +23,49 @@ void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
     canvas.show(splash);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     canvas.clear();
+    ASSERT(pipe_tile_b.size() <= 4, "Too much streams");
+    // Pointers to previously rendered frames
+    // avoids re-painting the same frame
+    std::shared_ptr<const cv::Mat> wide_ptr = NULL;
+    std::vector<std::shared_ptr<const cv::Mat>> fovea_ptrs;
     // Prepare display areas
-    // const unsigned int w = canvas.shape().w / 2, h = canvas.shape().h;
-    // cv::Rect display_tile[2] = {cv::Rect(50, 50, w - 100, h - 100),
-    //                             cv::Rect(w + 50, 50, w - 100, h - 100)};
-    const unsigned int w = canvas.shape().w, h = canvas.shape().h / 2;
-    cv::Rect display_tile[2] = {cv::Rect(50, 50, w - 100, h - 100),
-                                cv::Rect(50, h + 50, w - 100, h - 100)};
-    std::shared_ptr<const cv::Mat> mat_ptr[2] = {nullptr, nullptr};
-    cv::Mat mat_tile[2];
+    const unsigned w = canvas.shape().w, h = canvas.shape().h / 3;
+    static const unsigned pad = 10;
+    cv::Rect wide_view_tile = cv::Rect(pad, pad, w - (pad * 2), h - (pad * 2));
+    std::vector<cv::Rect> fovea_tiles;
+    for (unsigned int i = 0; i < pipe_tile_b.size(); i++) {
+      const unsigned row = i / 2, col = i % 2;
+      fovea_ptrs.push_back(NULL);
+      fovea_tiles.push_back(cv::Rect(w * col + pad, h * (row + 1) + pad,
+                                     w - (pad * 2), h - (pad * 2)));
+    }
     try {
       while (1) {
-        for (unsigned i = 0; i < 2; i++) {
-          auto next_ptr = (i == 0 ? pipe_tile_a : pipe_tile_b).read();
+        { // Wide angle
+          auto next_ptr = pipe_tile_a.read();
           if (next_ptr == nullptr)
             continue; // No Data Available
-          if (next_ptr == mat_ptr[i])
+          if (next_ptr == wide_ptr)
             continue; // Same Data
-          // Update pointer
-          mat_ptr[i] = next_ptr;
-          // Flip and show image
-          cv::flip(*mat_ptr[i], mat_tile[i], 1);
-          canvas.show(mat_tile[i], display_tile[i]);
+          // Update pointer and render to canvas
+          wide_ptr = next_ptr;
+          render(canvas, wide_ptr, wide_view_tile);
+        }
+        for (unsigned int i = 0; i < pipe_tile_b.size(); i++) { // Fovea streams
+          auto next_ptr = pipe_tile_b[i]->read();
+          if (next_ptr == nullptr)
+            continue; // No Data Available
+          if (next_ptr == fovea_ptrs[i])
+            continue; // Same Data
+          // Update pointer and render to canvas
+          wide_ptr = next_ptr;
+          render(canvas, wide_ptr, fovea_tiles[i]);
         }
       }
     } catch (Threading::Closed &e) {
       // Normal termination
     }
+    CATCH_ASSERT(;);
     // Wait until other threads terminate
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     // Restore splash screen
@@ -51,7 +75,8 @@ void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
     std::cerr << "[Thread::display] " << e.what() << std::endl;
   }
   pipe_tile_a.close();
-  pipe_tile_b.close();
+  for (auto &pipe : pipe_tile_b)
+    pipe->close();
   std::cout << "[Thread::display] terminated." << std::endl;
 }
 
