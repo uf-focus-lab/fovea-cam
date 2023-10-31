@@ -8,7 +8,7 @@
             "name": "debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/FoveaCam",
+            "program": "${workspaceFolder}/build/FoveaCam",
             "miDebuggerPath": "${workspaceFolder}/scripts/sudo_gdb.sh",
             "preLaunchTask": "Build:debug",
             "args": [

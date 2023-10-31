@@ -1,18 +1,20 @@
-#include "threading/exception.h"
 #include "threads.h"
 
 #include "context.h"
 
 #include "cobs/cobs.h"
 #include "fcmp/fcmp.h"
-#include "serial/serial.h"
+#include "threading/exception.h"
 #include "threading/fifo.h"
 #include "threading/flushing_pipe.h"
 
 #include <cerrno>
+#include <condition_variable>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unistd.h>
 
 struct {
@@ -20,18 +22,22 @@ struct {
   uint8_t buf[COBS_MAX_ENCODED];
 } serial_rx = {0, {0}}, fcmp_tx = {0, {0}};
 
+struct {
+  unsigned ack, rej;
+  std::mutex mutex;
+  std::condition_variable updated;
+} self;
+
 cobs_buffer_t cobs_rx, cobs_tx;
 
-#define SEND_TO_MEMS(FD, FIELD, VALUE)                                         \
+#define SEND_TO_MEMS(SERIAL, FIELD, VALUE)                                     \
   {                                                                            \
     cobs_reset(&cobs_tx);                                                      \
     fcmp_tx.size = fcmp_compose_frame(fcmp_tx.buf, FIELD, VALUE);              \
     int ret = cobs_encode(&cobs_tx, fcmp_tx.buf, fcmp_tx.size);                \
     if (ret < 0)                                                               \
       throw std::runtime_error("COBS encode error " + std::to_string(ret));    \
-    ssize_t write_ret = write(FD, (char *)cobs_tx.data, cobs_tx.length + 1);   \
-    if (write_ret < 0)                                                         \
-      throw std::runtime_error(std::strerror(errno));                          \
+    SERIAL.write((uint8_t *)cobs_tx.data, cobs_tx.length + 1);                 \
   }
 
 #define MEMS_MAX_INPUT 65535.0 // Max Digital Input: 16-bit unsigned integer
@@ -61,33 +67,28 @@ static inline void compute_channels(const double &pos, uint16_t &ch1,
   ch2 = DIGITAL_VOLTAGE(bias - voltage_shift);
 }
 
-void recv_thread(int fd,
+void recv_thread(USB::SerialDevice &device,
                  Threading::FlushingPipe<context::mems_position> &pos_out);
 
-namespace Thread {
+namespace thread {
 
-void mems(std::string const &serial_port,
+#undef LOG_NAME
+#define LOG_NAME "[Thread::mems]"
+
+void mems(USB::SerialDevice &serial,
           Threading::FIFO<context::mems_position> &pos_in,
           Threading::FlushingPipe<context::mems_position> &pos_out) {
-  // Initialize serial port
-  int fd = serial::init(serial_port.c_str(), B115200);
-  // Check for serial error
-  if (fd < 0) {
-    std::cerr << "Error opening serial port " << serial_port << std::endl;
-    pos_in.close();
-    pos_out.close();
-    return;
-  }
   // FCMP Field Buffer
   static fcmp_field_pos fcmp_position = {0};
   static fcmp_field_cfg fcmp_config = {0};
   // SET_BIT(config, FCMP_CFG_BIT_LOG);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
+  SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
   // Setup MEMS driver
-  SEND_TO_MEMS(fd, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
   // Start recv thread
-  std::thread recv([&]() { recv_thread(fd, pos_out); });
+  std::thread recv([&]() { recv_thread(serial, pos_out); });
   // Infinite loop until closed
   try {
     while (true) {
@@ -96,8 +97,21 @@ void mems(std::string const &serial_port,
       // Compute voltages
       compute_channels(pos->x, fcmp_position.ch[0], fcmp_position.ch[1]);
       compute_channels(pos->y, fcmp_position.ch[2], fcmp_position.ch[3]);
-      // Send frame
-      SEND_TO_MEMS(fd, FCMP_METHOD_SET | FCMP_FIELD_POS, fcmp_position);
+      // Send position until ACK
+      bool flag_next = false;
+      while (!flag_next) {
+        std::cout << LOG_NAME " Sending position (" << pos->x << ", " << pos->y
+                  << ")" << std::endl;
+        // Send frame
+        SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, fcmp_position);
+        // Check for ACK
+        std::unique_lock<std::mutex> lock(self.mutex);
+        while (self.ack == 0 && self.rej == 0)
+          self.updated.wait(lock);
+        flag_next = self.ack && !self.rej;
+        self.ack = self.rej = 0;
+        lock.unlock();
+      }
     }
   } catch (Threading::Closed &) {
     // Normal termination
@@ -107,40 +121,32 @@ void mems(std::string const &serial_port,
     std::cerr << "[Thread::mems] Unknown exception" << std::endl;
   }
   // Make sure COBS is flushed
-  write(fd, "\0\0\0\0", 4);
+  serial.write((uint8_t *)"\0\0\0\0", 4);
   // CLR_BIT(config, FCMP_CFG_BIT_LOG);
   CLR_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
   CLR_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
   // Disable mems driver
-  SEND_TO_MEMS(fd, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
   // Close both pipes
   pos_in.close();
   pos_out.close();
   // Wait for recv thread to terminate
+  std::cout << "[Thread::mems] waiting for recv thread." << std::endl;
   recv.join();
-  // Close serial port
-  close(fd);
   std::cout << "[Thread::mems] terminated." << std::endl;
 }
 
-} // namespace Thread
+} // namespace thread
 
+#undef LOG_NAME
 #define LOG_NAME "[Thread::mems::recv]"
 
-void serial_read(int fd) {
-  unsigned space = sizeof(serial_rx.buf) - serial_rx.size;
-  if (space) {
-    ssize_t ret = read(fd, (char *)serial_rx.buf + serial_rx.size, space);
-    if (ret > 0)
-      serial_rx.size += ret;
-    else if (ret == 0)
-      throw std::runtime_error("serial port closed");
-    else if (errno != EAGAIN)
-      throw std::runtime_error(std::strerror(errno));
-  }
+void serial_read(USB::SerialDevice &device) {
+  serial_rx.size = device.read((uint8_t *)serial_rx.buf, sizeof(serial_rx.buf),
+                               serial_rx.size);
 }
 
-void serial_flush(int fd) {
+void serial_flush(USB::SerialDevice &device) {
   while (true) {
     for (unsigned i = 0; i < serial_rx.size; i++) {
       if (serial_rx.buf[i] == 0) {
@@ -151,15 +157,15 @@ void serial_flush(int fd) {
     }
     // All bufferred bytes are non-zero
     serial_rx.size = 0;
-    serial_read(fd);
+    serial_read(device);
   }
 }
 
-void recv_thread(int fd,
+void recv_thread(USB::SerialDevice &device,
                  Threading::FlushingPipe<context::mems_position> &pos_out) {
   try {
-    while (true) {
-      serial_read(fd);
+    while (!flag_exit) {
+      serial_read(device);
       // Decode COBS
       int ret;
       while ((ret = cobs_decode(&cobs_rx, serial_rx.buf, serial_rx.size)) > 0) {
@@ -186,23 +192,41 @@ void recv_thread(int fd,
         const fcmp_frame_t *frame = (const fcmp_frame_t *)cobs_rx.data;
         const uint8_t method = frame->header & FCMP_METHOD,
                       field = frame->header & FCMP_FIELD;
-        if (method == FCMP_METHOD_ACK && field == FCMP_FIELD_POS) {
-          // Handle ACK:POS
-          const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
-          // Check payload size
-          if (payload_size != sizeof(fcmp_field_pos)) {
-            std::cerr << LOG_NAME " FCMP Position Payload Size Mismatch (Got "
-                      << (unsigned)payload_size << " Bytes, Expecting "
-                      << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
+        if (field == FCMP_FIELD_POS) {
+          if (method == FCMP_METHOD_ACK) {
+            // Handle ACK:POS
+            const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
+            // Check payload size
+            if (payload_size != sizeof(fcmp_field_pos)) {
+              std::cerr << LOG_NAME " FCMP Position Payload Size Mismatch (Got "
+                        << (unsigned)payload_size << " Bytes, Expecting "
+                        << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
+              continue;
+            }
+            { // Update acknowledge count
+              std::lock_guard<std::mutex> lock(self.mutex);
+              self.ack++;
+              self.updated.notify_all();
+            }
+            // Push position to output pipe
+            context::mems_position next_pos;
+            next_pos.x =
+                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]);
+            next_pos.y =
+                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]);
+            pos_out.write(next_pos);
+          } else if (method == FCMP_METHOD_REJ) {
+            { // Update rejection count
+              std::lock_guard<std::mutex> lock(self.mutex);
+              self.rej++;
+              self.updated.notify_all();
+            }
+            std::string message((const char *)frame->field, payload_size);
+            std::cerr << LOG_NAME " FCMP Position Request Rejected (" << message
+                      << ")" << std::endl;
             continue;
+            // fcmp_log_frame(method, field, frame->field, payload_size);
           }
-          // Push position to output pipe
-          context::mems_position next_pos;
-          next_pos.x = ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]);
-          next_pos.y = ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]);
-          pos_out.write(next_pos);
-        } else {
-          // fcmp_log_frame(method, field, frame->field, payload_size);
         }
       }
       if (ret == 0) {
@@ -210,7 +234,7 @@ void recv_thread(int fd,
         serial_rx.size = 0;
       } else { // ret < 0
         std::cerr << LOG_NAME " COBS Error: " << ret << std::endl;
-        serial_flush(fd);
+        serial_flush(device);
       }
     }
   } catch (Threading::Closed &) {
@@ -220,4 +244,5 @@ void recv_thread(int fd,
   } catch (...) {
     std::cerr << LOG_NAME " Unknown exception" << std::endl;
   }
+  std::cout << LOG_NAME " terminated." << std::endl;
 }

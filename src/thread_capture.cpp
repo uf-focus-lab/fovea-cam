@@ -3,20 +3,48 @@
 
 #include "threads.h"
 
-void configure(Spinnaker::CameraPtr camera) {
-  auto &node_map = camera->GetNodeMap();
-  Spinnaker::config(node_map, "TriggerMode", "Off");
-  Spinnaker::config(node_map, "LineSelector", "Line3");
-  Spinnaker::config(node_map, "LineMode", "Output");
-  Spinnaker::config(node_map, "LineSource", "ExposureActive");
-  Spinnaker::config(node_map, "AcquisitionMode", "Continuous");
-  Spinnaker::config(node_map, "ExposureAuto", "Off");
-  Spinnaker::config(node_map, "ExposureTime", 10000.0);
-  Spinnaker::config(node_map, "PixelFormat", "BGR8");
-  Spinnaker::config(node_map, "AdcBitDepth", "Bit10");
+#include <mutex>
 
-  auto &stream_node_map = camera->GetTLStreamNodeMap();
-  Spinnaker::config(stream_node_map, "StreamBufferHandlingMode", "NewestOnly");
+std::mutex mtx;
+
+void configure(Spinnaker::CameraPtr camera) {
+  std::lock_guard<std::mutex> lock(mtx);
+  const auto model = std::string(camera->DeviceModelName().c_str());
+  const auto is_zoom_camera = model.ends_with("BFS-U3-16S2C-BD");
+  std::cout << "[Thread::capture] Setting Up Camera \"" << model << "\""
+            << std::endl;
+  { // Camera parameters
+    auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
+    // Disable trigger input
+    map.set("TriggerMode", "Off");
+    // Enable strobe output on line3 (zoom camera only)
+    if (is_zoom_camera) {
+      map.set("LineSelector", "Line3");
+      map.set("LineMode", "Output");
+      map.set("LineSource", "ExposureActive");
+    }
+    // Capture parameters
+    map.set("AcquisitionMode", "Continuous");
+    map.set("AcquisitionFrameRateEnable", false);
+    // map.set("AcquisitionFrameRate", 60.0);
+    map.set("ExposureAuto", "Off");
+    map.set("ExposureTime", is_zoom_camera ? 10.0 * 1000.0 : 1000.0);
+    map.set("GainAuto", "Off");
+    map.set("Gain", is_zoom_camera ? 0.0 : 0.0);
+    // Image format
+    map.set("PixelFormat", "BayerRG8");
+    // Try and set ADC bit depth to 14, 12, 10, 8
+    false ||                               //
+        map.set("AdcBitDepth", "Bit14") || //
+        map.set("AdcBitDepth", "Bit12") || //
+        map.set("AdcBitDepth", "Bit10") || //
+        map.set("AdcBitDepth", "Bit8");
+  }
+  { // Stream parameters
+    auto map = Spinnaker::ConfigurableMap(camera->GetTLStreamNodeMap());
+    // Only latest buffer is used, old buffers are dropped.
+    map.set("StreamBufferHandlingMode", "NewestOnly");
+  }
 }
 
 namespace thread {
@@ -54,7 +82,7 @@ void capture(Spinnaker::CameraPtr camera,
   } catch (Spinnaker::Exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
   }
-  std::cout << "[capture_thread] terminated." << std::endl;
+  std::cout << "[Thread::capture] terminated." << std::endl;
 }
 
 } // namespace thread

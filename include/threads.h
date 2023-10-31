@@ -2,7 +2,10 @@
 
 #include "threading/fifo.h"
 #include "threading/flushing_pipe.h"
+#include "usb/serial_device.h"
 #include "util/spinnaker.h"
+
+extern bool flag_exit;
 
 namespace thread {
 
@@ -15,7 +18,7 @@ void stack(Threading::FlushingPipe<cv::Mat> &pipe_in,
 void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
              Threading::FlushingPipe<cv::Mat> &pipe_tile_b);
 
-void mems(std::string const &serial_port,
+void mems(USB::SerialDevice &device,
           Threading::FIFO<context::mems_position> &pos_in,
           Threading::FlushingPipe<context::mems_position> &pos_out);
 

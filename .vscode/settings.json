@@ -2,10 +2,12 @@
     "C_Cpp.intelliSenseEngine": "disabled",
     "editor.tabSize": 2,
     "clangd.arguments": [
-        "--compile-commands-dir=bin/"
+        "--compile-commands-dir=build/"
     ],
     "cSpell.words": [
+        "altsetting",
         "argparse",
-        "fcmp"
+        "fcmp",
+        "libusb"
     ],
 }

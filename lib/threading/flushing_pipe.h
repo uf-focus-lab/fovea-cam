@@ -29,7 +29,7 @@ public:
     std::unique_lock<std::mutex> lock(mutex);
     if (!open)
       throw Closed();
-    this->ptr = std::make_shared<const T>(data);
+    this->ptr = std::make_shared<const T>(std::move(data));
     lock.unlock();
   }
 

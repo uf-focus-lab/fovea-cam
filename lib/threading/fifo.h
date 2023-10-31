@@ -12,35 +12,52 @@ template <typename T> class FIFO {
 private:
   std::queue<std::shared_ptr<T>> queue;
   std::mutex mutex;
-  std::condition_variable cond;
+  std::condition_variable cond_r, cond_w;
   bool closed = false;
+  size_t max_size = 0;
 
 public:
-  FIFO<T>(size_t size = 256) { queue.reserve(size); }
+  FIFO(size_t max_size = 0) : max_size(max_size) {}
   // Data passed in should be allocated with new
   void write(T &data) {
     std::unique_lock<std::mutex> lock(mutex);
-    if (closed)
+    while ((max_size == 0 || queue.size() >= max_size) && !closed)
+      cond_r.wait(lock);
+    if (closed) {
+      lock.unlock();
+      cond_w.notify_all();
       throw Threading::Closed();
-    queue.push(std::make_unique<T>(data));
-    cond.notify_one();
+    }
+    queue.push(std::make_shared<T>(std::move(data)));
+    cond_w.notify_all();
   }
+
   std::shared_ptr<T> read() {
     std::unique_lock<std::mutex> lock(mutex);
     while (queue.empty() && !closed)
-      cond.wait(lock);
-    if (closed)
+      cond_w.wait(lock);
+    if (closed) {
+      lock.unlock();
+      cond_r.notify_all();
       throw Threading::Closed();
+    }
     auto ptr = queue.front();
     queue.pop();
     lock.unlock();
+    cond_r.notify_all();
     return ptr;
   }
-  void close() {
+
+  void close(bool wait_empty = false) {
     std::unique_lock<std::mutex> lock(mutex);
+    if (wait_empty) {
+      while (!queue.empty())
+        cond_r.wait(lock);
+    }
     closed = true;
-    cond.notify_all();
     lock.unlock();
+    cond_r.notify_all();
+    cond_w.notify_all();
   }
 };
 

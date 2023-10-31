@@ -1,5 +1,6 @@
 #include "spinnaker.h"
 
+#include "SpinGenApi/Pointer.h"
 #include "util/assert.h"
 
 #include <iostream>
@@ -50,9 +51,7 @@ cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
   cv::Mat mat(height, width, fmt.type, image_ptr->GetData(),
               image_ptr->GetStride());
   if (fmt.cvt > 0) {
-    cv::Mat tmp;
-    cv::cvtColor(mat, tmp, fmt.cvt);
-    mat = tmp;
+    cv::cvtColor(mat, mat, fmt.cvt);
   }
   if (mat.depth() != 8) {
     cv::Mat tmp;
@@ -69,14 +68,21 @@ cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
 
 #define CATCH(NAME, KEY, VALUE)                                                \
   catch (std::exception & e) {                                                 \
-    std::cerr << "[Spinnaker::config] Warning: unable to set <" NAME "> "      \
-              << KEY << " = " << VALUE << " (" << e.what() << ")"            \
-              << std::endl;                                                    \
-  }
+    std::cerr << "[Spinnaker::config] Unable to set <" NAME "> " << KEY        \
+              << " = " << VALUE << " (" << e.what() << ")" << std::endl;       \
+    return 0;                                                                  \
+  }                                                                            \
+  return 1;
 
-void config(GenApi::INodeMap &node_map, const char *key, const char *value) {
+ConfigurableMap::ConfigurableMap(GenApi::INodeMap &map) : map(map){};
+
+/**
+ * @brief Set enum entry by given entry name
+ * @returns 1 on success, 0 on failure
+ */
+int ConfigurableMap::set(const char *key, const char *value) {
   try {
-    const auto node = node_map.GetNode(key);
+    const auto node = this->map.GetNode(key);
     const auto view = GenApi::CEnumerationPtr(node);
     CHECK(view);
     const auto entry = view->GetEntryByName(value);
@@ -88,9 +94,27 @@ void config(GenApi::INodeMap &node_map, const char *key, const char *value) {
   CATCH("enum", key, value);
 }
 
-void config(GenApi::INodeMap &node_map, const char *key, const int value) {
+/**
+ * @brief Set boolean entry by given value
+ * @returns 1 on success, 0 on failure
+ */
+int ConfigurableMap::set(const char *key, const bool value) {
   try {
-    const auto node = node_map.GetNode(key);
+    const auto node = this->map.GetNode(key);
+    const auto view = GenApi::CBooleanPtr(node);
+    CHECK(view);
+    view->SetValue(value);
+  }
+  CATCH("int", key, value);
+}
+
+/**
+ * @brief Set int entry by given value
+ * @returns 1 on success, 0 on failure
+ */
+int ConfigurableMap::set(const char *key, const int value) {
+  try {
+    const auto node = this->map.GetNode(key);
     const auto view = GenApi::CIntegerPtr(node);
     CHECK(view);
     view->SetValue(value);
@@ -98,9 +122,13 @@ void config(GenApi::INodeMap &node_map, const char *key, const int value) {
   CATCH("int", key, value);
 }
 
-void config(GenApi::INodeMap &node_map, const char *key, const double value) {
+/**
+ * @brief Set double entry by given value
+ * @returns 1 on success, 0 on failure
+ */
+int ConfigurableMap::set(const char *key, const double value) {
   try {
-    const auto node = node_map.GetNode(key);
+    const auto node = this->map.GetNode(key);
     const auto view = GenApi::CFloatPtr(node);
     CHECK(view);
     view->SetValue(value);

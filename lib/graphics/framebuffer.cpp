@@ -5,40 +5,33 @@
 #include <fcntl.h>
 #include <iostream>
 #include <opencv2/core/mat.hpp>
+#include <stdexcept>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
+#define CHECK(VAL)                                                             \
+  if (!(VAL)) {                                                                \
+    throw std::runtime_error(std::strerror(errno));                            \
+  }
 
 namespace fb {
 
 void FrameBuffer::init_fd(std::string path) {
   /* Open the file for reading and writing */
   fd = open(path.c_str(), O_RDWR | O_SYNC);
-  if (!fd) {
-    std::cerr << "[framebuffer::ERROR] Cannot open framebuffer device."
-              << std::endl;
-    throw;
-  }
+  CHECK(fd >= 0);
   std::cout << "Successfully opened " << path << std::endl;
   /* Get finfo and vinfo from fd */
-  if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo)) {
-    std::cerr << "[framebuffer::ERROR] Unable to read finfo." << std::endl;
-    throw;
-  }
-  if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo)) {
-    std::cerr << "[framebuffer::ERROR] Unable to read vinfo." << std::endl;
-    throw;
-  }
+  CHECK(ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == 0);
+  CHECK(ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == 0);
   /* Check if using 32 bit pixels */
   switch (vinfo.bits_per_pixel) {
   case 24:
   case 32:
     break;
   default:
-    std::cerr << "[framebuffer::ERROR] Only 32 bit pixel format is currently "
-                 "supported."
-              << std::endl;
-    throw;
+    throw std::runtime_error("Only 32 bit pixel format is currently supported");
   }
 }
 
@@ -55,7 +48,7 @@ void FrameBuffer::buffer_init() {
   //   std::cerr
   //       << "[framebuffer::ERROR] Failed to map framebuffer device to memory."
   //       << std::endl;
-  //   throw;
+  // throw std::runtime_error("");
   // }
 }
 
@@ -93,7 +86,7 @@ FrameBuffer::FrameBuffer(const FrameBuffer &) {
   std::cerr << "[framebuffer::ERROR] Copy constructor is not allowed."
             << std::endl
             << "    Pass by reference only." << std::endl;
-  throw;
+  throw std::runtime_error("");
 }
 
 FrameBuffer::~FrameBuffer() {
