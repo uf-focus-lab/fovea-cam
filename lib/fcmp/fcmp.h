@@ -67,6 +67,7 @@ typedef uint16_t fcmp_field_cfg;
 // Position getting and setting commands
 struct fcmp_field_pos {
   uint16_t ch[4];
+  uint16_t tag;
 };
 
 // MEMS low pass filter clock configuration

@@ -1,3 +1,5 @@
+#include "mems/mems.h"
+
 #include "util/assert.h"
 #include "util/spinnaker.h"
 #include "util/time.h"
@@ -8,7 +10,7 @@
 #include <mutex>
 
 #undef LOGNAME
-#define LOGNAME "[Thread::capture]"
+#define LOGNAME "[thread::capture]"
 
 std::mutex configure_mutex;
 
@@ -34,7 +36,7 @@ void configure(Spinnaker::CameraPtr &camera,
     if (thread::env.FRAMERATE) {
       const auto env_rate = std::string(thread::env.FRAMERATE);
       const double rate = std::stod(env_rate);
-      std::cout << "[Thread::capture] Setting framerate to " << rate
+      std::cout << "[thread::capture] Setting framerate to " << rate
                 << " (raw: " << env_rate << ")" << std::endl;
       ASSERT(rate > 0.0, "Invalid framerate");
       map.set("AcquisitionFrameRateEnable", true);
@@ -45,9 +47,9 @@ void configure(Spinnaker::CameraPtr &camera,
 
     map.set("ExposureAuto", "Off");
     // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
-    map.set("ExposureTime", 20.0 * 1000.0);
+    map.set("ExposureTime", is_zoom_camera ? 10.0 * 1000.0 : 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 36.0 : 10.0);
+    map.set("Gain", is_zoom_camera ? 0.0 : 0.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -81,13 +83,30 @@ void capture(Spinnaker::CameraPtr &camera,
   }
   // Capture loop
   try {
+    std::shared_ptr<mems::SyncWindow> sync_window = mems::sync.read();
     while (1) {
       auto img_ptr = camera->GetNextImage();
-      // std::cout << LOGNAME "    FRAME   " << timestamp() << std::endl;
-      // Get frame count modulo number of pipes
-      const auto counter = frame_counter.read();
-      const unsigned idx = (counter ? counter->n : 0) % pipes_out.size();
-      pipes_out[idx]->write(Spinnaker::fromImagePtr(img_ptr));
+      auto now = Time::us();
+      // Find the matching sync window
+      while (sync_window->test(now) > 0) {
+        sync_window = mems::sync.read();
+      }
+      // Use the sync window to determine the position tag
+      const auto tag = sync_window->tag();
+
+      // std::cerr << LOGNAME " Got tag (" << tag << ")" << std::endl;
+      if (tag == 0) {
+        // BroadCast
+        auto mat_ptr =
+            std::make_shared<const cv::Mat>(Spinnaker::fromImagePtr(img_ptr));
+        for (auto &pipe : pipes_out)
+          pipe->write(mat_ptr);
+      } else if (tag <= pipes_out.size()) {
+        // Specific
+        pipes_out[tag - 1]->write(Spinnaker::fromImagePtr(img_ptr));
+      } else {
+        std::cerr << LOGNAME "Invalid position tag: " << tag << std::endl;
+      }
     }
   } catch (Threading::END &e) {
     // Normal termination

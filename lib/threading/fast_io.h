@@ -21,6 +21,13 @@ private:
     this->ptr = ptr;
   }
 
+  void assign(std::shared_ptr<const T> &ptr) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!open)
+      throw END();
+    this->ptr = ptr;
+  }
+
 public:
   ~FastIO() { close(); }
 
@@ -31,11 +38,12 @@ public:
     return ptr;
   }
 
-  void write(const T *data) { assign(std::shared_ptr<const T>(data)); }
+  void write(std::shared_ptr<const T> &data) { assign(data); }
   void write(const T &data) { assign(std::make_shared<const T>(data)); }
   void write(const T &&data) {
     assign(std::make_shared<const T>(std::move(data)));
   }
+  void write(const T *data) { assign(std::shared_ptr<const T>(data)); }
 
   void close() {
     std::lock_guard<std::mutex> lock(mutex);

@@ -82,28 +82,35 @@ canvas::shape Canvas::shape() {
   }
 }
 
-void Canvas::clear() { clear(0); }
-
-void Canvas::clear(uint8_t color) {
-  mat = color;
-  show();
+Canvas &Canvas::clear() {
+  clear(0);
+  return *this;
 }
 
-void Canvas::clear(cv::Scalar color) {
+Canvas &Canvas::clear(uint8_t color) {
   mat = color;
-  show();
+  return *this;
+}
+
+Canvas &Canvas::clear(cv::Scalar color) {
+  mat = color;
+  return *this;
 }
 
 // Send the current buffer to display
-void Canvas::show() { show(mat, transform); }
+Canvas &Canvas::show() {
+  show(mat, transform);
+  return *this;
+}
 
-void Canvas::show(const cv::Mat &src, int transform) {
+Canvas &Canvas::show(const cv::Mat &src, int transform) {
   show(src,
        cv::Rect{0, 0, static_cast<int>(shape().w), static_cast<int>(shape().h)},
        transform);
+  return *this;
 }
 
-void Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
+Canvas &Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
   cv::Mat dst;
   // Scale down to fit, retain aspect ratio
   if (src.cols > tile.width || src.rows > tile.height) {
@@ -117,9 +124,10 @@ void Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
   cv::Point pos(tile.x + (tile.width - dst.cols) / 2,
                 tile.y + (tile.height - dst.rows) / 2);
   render(dst, pos, transform);
+  return *this;
 }
 
-void Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
+Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   const auto info = fb.info();
   // Apply transform
   const auto tile_transform = transform ^ this->transform;
@@ -131,32 +139,27 @@ void Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
                                     tile_transform);
   pos = corner_pos - corner_off;
   // Check if trim is necessary
-  bool flag_trim = false;
   cv::Rect trim = {0, 0, dst.cols, dst.rows};
   if (dst.cols + pos.x > static_cast<int>(info.width)) {
     trim.width = info.width - pos.x;
-    flag_trim = true;
   }
   if (dst.rows + pos.y > static_cast<int>(info.height)) {
     trim.height = info.height - pos.y;
-    flag_trim = true;
   }
-  if (flag_trim)
-    dst = dst(trim);
+  dst = dst(trim);
   // Place the display image to buffer
   if (dst.cols < static_cast<int>(info.width) &&
       dst.rows < static_cast<int>(info.height)) {
-    const off_t fb_line_size = info.width * info.bytes_per_pixel,
-                x_offset = pos.x * info.bytes_per_pixel,
-                y_offset = pos.y * fb_line_size,
-                disp_line_size = dst.cols * dst.elemSize();
-    for (int n = 0; n < dst.rows; n++) {
-      fb.from(dst.data + n * disp_line_size,
-              y_offset + n * fb_line_size + x_offset, disp_line_size);
-    }
-  } else
-    // Apply transform
-    fb.from(dst.data);
+    dst.copyTo(mat(cv::Rect(pos, dst.size())));
+  } else {
+    dst.copyTo(mat);
+  }
+  return *this;
+}
+
+Canvas &Canvas::apply() {
+  fb.from(mat.data);
+  return *this;
 }
 
 } // namespace canvas

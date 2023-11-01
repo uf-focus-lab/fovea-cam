@@ -17,10 +17,10 @@
 
 typedef struct cobs_buffer_s {
   union {
-    uint8_t index;
-    uint8_t length;
+    size_t index;
+    size_t length;
   };
-  uint8_t counter;
+  size_t counter;
   // Pseudo element that will be used to store data
   uint8_t data[COBS_MAX_ENCODED];
 } cobs_buffer_t;
@@ -35,7 +35,7 @@ void cobs_reset(cobs_buffer_t *buf);
  *         Positive value indicates output length, excluding tailing zero.
  *         Negative value indicates error.
  */
-int cobs_encode(cobs_buffer_t *buf, const uint8_t *input, const uint8_t len);
+int cobs_encode(cobs_buffer_t *buf, const uint8_t *input, const size_t len);
 
 /**
  * @brief Decodes a given buffer using COBS algorithm.
@@ -48,7 +48,7 @@ int cobs_encode(cobs_buffer_t *buf, const uint8_t *input, const uint8_t len);
  *         Special:   0   indicates frame is not finished.
  *         Negative value indicates decoding error.
  */
-int cobs_decode(cobs_buffer_t *buf, const uint8_t *input, const uint8_t len);
+int cobs_decode(cobs_buffer_t *buf, const uint8_t *input, const size_t len);
 
 /**
  * @brief Utility function to move buffer content n bytes ahead.
@@ -57,7 +57,7 @@ int cobs_decode(cobs_buffer_t *buf, const uint8_t *input, const uint8_t len);
  * @param size - Pointer to the size of the buffer (before move)
  * @param offset - Number of bytes to move ahead
  */
-static inline void move_ahead(uint8_t *head, unsigned *size, unsigned offset) {
+inline void move_ahead(uint8_t *head, size_t *size, size_t offset) {
   if (!offset)
     return;
   if (offset >= *size) {

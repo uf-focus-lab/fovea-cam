@@ -21,9 +21,6 @@ std::vector<Threading::FastIO<cv::Mat> *> fovea_pipes;
 Threading::FIFO<context::MEMS_Position> pos_in;
 Threading::FastIO<context::MEMS_Position> pos_out;
 
-// Signal to kill all threads
-bool flag_exit = false;
-
 #define NO_THROW(STATEMENT)                                                    \
   try {                                                                        \
     STATEMENT;                                                                 \
@@ -34,7 +31,7 @@ bool flag_exit = false;
 
 void close_all_pipes(int) {
   std::cout << std::endl;
-  flag_exit = true;
+  thread::flag_exit = true;
   NO_THROW(wide_view_pipe.close());
   for (auto &pipe : fovea_pipes) {
     NO_THROW(pipe->close());
@@ -45,12 +42,6 @@ void close_all_pipes(int) {
   signal(SIGINT, SIG_DFL);
   signal(SIGKILL, SIG_DFL);
   signal(SIGTERM, SIG_DFL);
-}
-
-namespace thread {
-
-ENV env;
-
 }
 
 int main() {
@@ -108,17 +99,26 @@ int main() {
       std::thread([&]() { thread::mems(mems, pos_in, pos_out); }));
   // Send positions
   try {
-    for (double offset = 80.0; offset > -80.0; offset -= 1) {
-      // // for (double y = -60.0; y < 60.0; y += 1.0) {
-      // // for (double x = 60.0; x > -60.0; x -= 1.0) {
-      pos_in.write(context::MEMS_Position(offset, -offset * 0.75));  // 3
-      pos_in.write(context::MEMS_Position(-offset, offset * 0.75));  // 2
-      pos_in.write(context::MEMS_Position(offset, offset * 0.75));   // 1
-      pos_in.write(context::MEMS_Position(-offset, -offset * 0.75)); // 4
-    }
-    // }
-    // }
+    // Broadcast idle position
     pos_in.write(context::MEMS_Position(0, 0));
+    pos_in.write(context::MEMS_Position(0, 0));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    double step = 1.0, pos = 0.0;
+    while (true) {
+      pos += step;
+      if (pos >= 80.0)
+        step = -1.0;
+      if (step < 0.0 && pos <= 0.0)
+        break;
+      pos_in.write(context::MEMS_Position(pos, pos, 2));
+      pos_in.write(context::MEMS_Position(-pos, pos, 1));
+      pos_in.write(context::MEMS_Position(-pos, -pos, 3));
+      pos_in.write(context::MEMS_Position(pos, -pos, 4));
+    }
+    // Broadcast idle position
+    pos_in.write(context::MEMS_Position(0, 0));
+    pos_in.write(context::MEMS_Position(0, 0));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   } catch (Threading::END &) {
     // Normal termination
   }

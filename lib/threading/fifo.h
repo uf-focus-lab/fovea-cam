@@ -18,6 +18,19 @@ private:
   // Maximum size of queue, 0 for unlimited
   size_t max_size = 0;
 
+  void push(T data) {
+    std::unique_lock<std::mutex> lock(mutex);
+    while (max_size > 0 && queue.size() >= max_size && !closed)
+      cond_r.wait(lock);
+    if (closed) {
+      lock.unlock();
+      cond_w.notify_all();
+      throw Threading::END();
+    }
+    queue.push(data);
+    cond_w.notify_all();
+  }
+
   void push(T &&data) {
     std::unique_lock<std::mutex> lock(mutex);
     while (max_size > 0 && queue.size() >= max_size && !closed)
@@ -34,9 +47,14 @@ private:
 public:
   FIFO(size_t max_size = 0) : max_size(max_size) {}
 
+  bool empty() {
+    std::unique_lock<std::mutex> lock(mutex);
+    return queue.empty();
+  }
+
   void write(T *data) { push(*data); }
   void write(T &data) { push(data); }
-  void write(T &&data) { push(std::move(data)); }
+  void write(T &&data) { push(data); }
 
   T read() {
     std::unique_lock<std::mutex> lock(mutex);

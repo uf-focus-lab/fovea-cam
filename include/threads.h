@@ -1,26 +1,15 @@
 #include "context.h"
 
-#include "threading/fifo.h"
 #include "threading/fast_io.h"
+#include "threading/fifo.h"
 #include "usb/serial_device.h"
 #include "util/spinnaker.h"
 
-extern bool flag_exit;
-
 namespace thread {
 
-class FrameCounter {
-public:
-  const unsigned n;
-  FrameCounter(unsigned n) : n(n) {}
-};
+extern bool flag_exit;
 
-extern Threading::FastIO<FrameCounter> frame_counter;
-
-typedef struct {
-  char *FRAMERATE;
-} ENV;
-extern ENV env;
+extern struct Env { char *FRAMERATE; } env;
 
 void capture(Spinnaker::CameraPtr &camera,
              Threading::FastIO<cv::Mat> &pipe_out);

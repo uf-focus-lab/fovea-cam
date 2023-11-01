@@ -43,17 +43,20 @@ public:
   // Shape of the canvas (after transformation)
   canvas::shape shape();
   // Set the color for entire buffer
-  void clear();
-  void clear(uint8_t);
-  void clear(cv::Scalar);
+  Canvas &clear();
+  Canvas &clear(uint8_t);
+  Canvas &clear(cv::Scalar);
   // Send the current buffer to display
-  void show();
+  Canvas &show();
   // Use provided mat instead
-  void show(const cv::Mat &, int transform = transform::NONE);
+  Canvas &show(const cv::Mat &, int transform = transform::NONE);
   // Specify a region on display to project to
-  void show(const cv::Mat &, cv::Rect, int transform = transform::NONE);
-  // Render to framebuffer without any transformation
-  void render(const cv::Mat &, cv::Point pos = {0, 0}, int transform = transform::NONE);
+  Canvas &show(const cv::Mat &, cv::Rect, int transform = transform::NONE);
+  // Render to internal buffer without any transformation
+  Canvas &render(const cv::Mat &, cv::Point pos = {0, 0},
+                 int transform = transform::NONE);
+  // Apply internal buffer to framebuffer
+  Canvas &apply();
 };
 
 } // namespace canvas

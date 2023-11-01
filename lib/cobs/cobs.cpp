@@ -12,9 +12,8 @@ void cobs_reset(cobs_buffer_t *buf) {
   buf->counter = 0;
 };
 
-int cobs_encode(cobs_buffer_t *buf, const uint8_t *input,
-                const uint8_t len) {
-  for (uint8_t i = 0; i < len; i++) {
+int cobs_encode(cobs_buffer_t *buf, const uint8_t *input, const size_t len) {
+  for (size_t i = 0; i < len; i++) {
     // Check for buffer overflow
     if (buf->index == COBS_MAX_CONTENT) {
       return -1;
@@ -40,9 +39,8 @@ int cobs_encode(cobs_buffer_t *buf, const uint8_t *input,
   return ((int)buf->index);
 };
 
-int cobs_decode(cobs_buffer_t *buf, const uint8_t *input,
-                const uint8_t len) {
-  uint8_t i = 0;
+int cobs_decode(cobs_buffer_t *buf, const uint8_t *input, const size_t len) {
+  size_t i = 0;
   for (; i < len; i++) {
     // Handle next byte
     const uint8_t next_byte = input[i];
