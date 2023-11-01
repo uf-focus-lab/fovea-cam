@@ -13,8 +13,8 @@ void render(canvas::Canvas &canvas, std::shared_ptr<const cv::Mat> frame,
 
 namespace thread {
 
-void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
-             std::vector<Threading::FlushingPipe<cv::Mat> *> pipe_tile_b) {
+void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
+             std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b) {
   try {
     vtconsole::unbind_all();
     canvas::Canvas canvas("/dev/fb0", canvas::transform::NONE);
@@ -36,8 +36,8 @@ void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
     for (unsigned int i = 0; i < pipe_tile_b.size(); i++) {
       const unsigned row = i / 2, col = i % 2;
       fovea_ptrs.push_back(NULL);
-      fovea_tiles.push_back(cv::Rect(w * col + pad, h * (row + 1) + pad,
-                                     w - (pad * 2), h - (pad * 2)));
+      fovea_tiles.push_back(cv::Rect((w / 2) * col + pad, h * (row + 1) + pad,
+                                     (w / 2) - (pad * 2), h - (pad * 2)));
     }
     try {
       while (1) {
@@ -62,7 +62,7 @@ void display(Threading::FlushingPipe<cv::Mat> &pipe_tile_a,
           render(canvas, wide_ptr, fovea_tiles[i]);
         }
       }
-    } catch (Threading::Closed &e) {
+    } catch (Threading::END &e) {
       // Normal termination
     }
     CATCH_ASSERT(;);

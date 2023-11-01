@@ -3,6 +3,6 @@
 
 namespace Threading {
 
-class Closed : public std::exception {};
+class END : public std::exception {};
 
 } // namespace Threading

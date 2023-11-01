@@ -1,17 +1,22 @@
 #include "util/assert.h"
 #include "util/spinnaker.h"
+#include "util/time.h"
 
 #include "threads.h"
 
+#include <cstdlib>
 #include <mutex>
 
-std::mutex mtx;
+#undef LOGNAME
+#define LOGNAME "[Thread::capture]"
 
-void configure(Spinnaker::CameraPtr camera) {
-  std::lock_guard<std::mutex> lock(mtx);
-  const auto model = std::string(camera->DeviceModelName().c_str());
-  const auto is_zoom_camera = model.ends_with("BFS-U3-16S2C-BD");
-  std::cout << "[Thread::capture] Setting Up Camera \"" << model << "\""
+std::mutex configure_mutex;
+
+void configure(Spinnaker::CameraPtr &camera,
+               const bool is_zoom_camera = false) {
+  camera->Init();
+  std::lock_guard<std::mutex> lock(configure_mutex);
+  std::cout << LOGNAME " Setting up " << camera->DeviceModelName().c_str()
             << std::endl;
   { // Camera parameters
     auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
@@ -25,12 +30,24 @@ void configure(Spinnaker::CameraPtr camera) {
     }
     // Capture parameters
     map.set("AcquisitionMode", "Continuous");
-    map.set("AcquisitionFrameRateEnable", false);
-    // map.set("AcquisitionFrameRate", 60.0);
+
+    if (thread::env.FRAMERATE) {
+      const auto env_rate = std::string(thread::env.FRAMERATE);
+      const double rate = std::stod(env_rate);
+      std::cout << "[Thread::capture] Setting framerate to " << rate
+                << " (raw: " << env_rate << ")" << std::endl;
+      ASSERT(rate > 0.0, "Invalid framerate");
+      map.set("AcquisitionFrameRateEnable", true);
+      map.set("AcquisitionFrameRate", rate);
+    } else {
+      map.set("AcquisitionFrameRateEnable", false);
+    }
+
     map.set("ExposureAuto", "Off");
-    map.set("ExposureTime", is_zoom_camera ? 10.0 * 1000.0 : 1000.0);
+    // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
+    map.set("ExposureTime", 20.0 * 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 0.0 : 0.0);
+    map.set("Gain", is_zoom_camera ? 36.0 : 10.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -45,16 +62,16 @@ void configure(Spinnaker::CameraPtr camera) {
     // Only latest buffer is used, old buffers are dropped.
     map.set("StreamBufferHandlingMode", "NewestOnly");
   }
+  // Get time offset relative to OS timestamp
+  camera->BeginAcquisition();
 }
 
 namespace thread {
-
-void capture(Spinnaker::CameraPtr camera,
-             std::vector<Threading::FlushingPipe<cv::Mat> *> pipes_out) {
+// Zoom camera
+void capture(Spinnaker::CameraPtr &camera,
+             std::vector<Threading::FastIO<cv::Mat> *> pipes_out) {
   try {
-    camera->Init();
-    configure(camera);
-    camera->BeginAcquisition();
+    configure(camera, true);
   } catch (std::exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
     for (auto &pipe : pipes_out) {
@@ -65,38 +82,43 @@ void capture(Spinnaker::CameraPtr camera,
   // Capture loop
   try {
     while (1) {
-      for (auto &pipe : pipes_out) {
-        auto img_ptr = camera->GetNextImage();
-        // auto timestamp = img_ptr->GetTimeStamp();
-        pipe->write(Spinnaker::fromImagePtr(img_ptr));
-      }
+      auto img_ptr = camera->GetNextImage();
+      // std::cout << LOGNAME "    FRAME   " << timestamp() << std::endl;
+      // Get frame count modulo number of pipes
+      const auto counter = frame_counter.read();
+      const unsigned idx = (counter ? counter->n : 0) % pipes_out.size();
+      pipes_out[idx]->write(Spinnaker::fromImagePtr(img_ptr));
     }
-  } catch (Threading::Closed &e) {
+  } catch (Threading::END &e) {
     // Normal termination
   } catch (Spinnaker::Exception &e) {
-    std::cerr << "Spinnaker Error: " << e.what() << std::endl;
-  } catch (...) {
-    std::cerr << "Unknown Error" << std::endl;
+    std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
+    for (auto &pipe : pipes_out) {
+      pipe->close();
+    }
   }
+  CATCH_ASSERT(;) catch (...) {
+    std::cerr << LOGNAME "Unknown Error" << std::endl;
+    for (auto &pipe : pipes_out) {
+      pipe->close();
+    }
+  };
   // Release camera instance
   try {
     camera->EndAcquisition();
     camera->DeInit();
-    camera = nullptr;
   } catch (Spinnaker::Exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << LOGNAME "Error: " << e.what() << std::endl;
   }
-  std::cout << "[Thread::capture] terminated." << std::endl;
+  std::cout << LOGNAME " terminated." << std::endl;
 }
 
-void capture(Spinnaker::CameraPtr camera,
-             Threading::FlushingPipe<cv::Mat> &pipe_out) {
+void capture(Spinnaker::CameraPtr &camera,
+             Threading::FastIO<cv::Mat> &pipe_out) {
   try {
-    camera->Init();
     configure(camera);
-    camera->BeginAcquisition();
   } catch (std::exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << LOGNAME "Error: " << e.what() << std::endl;
     pipe_out.close();
     return;
   }
@@ -104,25 +126,24 @@ void capture(Spinnaker::CameraPtr camera,
   try {
     while (1) {
       auto img_ptr = camera->GetNextImage();
-      // auto timestamp = img_ptr->GetTimeStamp();
       pipe_out.write(Spinnaker::fromImagePtr(img_ptr));
     }
-  } catch (Threading::Closed &e) {
+  } catch (Threading::END &e) {
     // Normal termination
   } catch (Spinnaker::Exception &e) {
-    std::cerr << "Spinnaker Error: " << e.what() << std::endl;
+    std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
   } catch (...) {
-    std::cerr << "Unknown Error" << std::endl;
+    std::cerr << LOGNAME "Unknown Error" << std::endl;
+    pipe_out.close();
   }
   // Release camera instance
   try {
     camera->EndAcquisition();
     camera->DeInit();
-    camera = nullptr;
   } catch (Spinnaker::Exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    std::cerr << LOGNAME "Error: " << e.what() << std::endl;
   }
-  std::cout << "[Thread::capture] terminated." << std::endl;
+  std::cout << LOGNAME " terminated." << std::endl;
 }
 
 } // namespace thread

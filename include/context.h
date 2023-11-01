@@ -2,10 +2,12 @@
 
 namespace context {
 
-typedef struct {
+class MEMS_Position {
+public:
   // Value range: [-v_bias, +v_bias]
   // Out-ranged values will be clipped to nearest boundary.
   double x, y;
-} mems_position;
+  MEMS_Position(double x, double y) : x(x), y(y) {}
+};
 
 } // namespace context

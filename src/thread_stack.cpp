@@ -2,8 +2,8 @@
 
 namespace thread {
 
-void stack(Threading::FlushingPipe<cv::Mat> &pipe_in,
-           Threading::FlushingPipe<cv::Mat> &pipe_out, const size_t n) {
+void stack(Threading::FastIO<cv::Mat> &pipe_in,
+           Threading::FastIO<cv::Mat> &pipe_out, const size_t n) {
   size_t counter = 0;
   cv::Mat stack;
   while (1) {
@@ -23,7 +23,7 @@ void stack(Threading::FlushingPipe<cv::Mat> &pipe_in,
         pipe_out.write(result);
         counter = 0;
       }
-    } catch (Threading::Closed &e) {
+    } catch (Threading::END &e) {
       break;
     }
   }

@@ -6,7 +6,8 @@
 #include "fcmp/fcmp.h"
 #include "threading/exception.h"
 #include "threading/fifo.h"
-#include "threading/flushing_pipe.h"
+#include "threading/fast_io.h"
+#include "util/time.h"
 
 #include <cerrno>
 #include <condition_variable>
@@ -68,7 +69,7 @@ static inline void compute_channels(const double &pos, uint16_t &ch1,
 }
 
 void recv_thread(USB::SerialDevice &device,
-                 Threading::FlushingPipe<context::mems_position> &pos_out);
+                 Threading::FastIO<context::MEMS_Position> &pos_out);
 
 namespace thread {
 
@@ -76,8 +77,8 @@ namespace thread {
 #define LOG_NAME "[Thread::mems]"
 
 void mems(USB::SerialDevice &serial,
-          Threading::FIFO<context::mems_position> &pos_in,
-          Threading::FlushingPipe<context::mems_position> &pos_out) {
+          Threading::FIFO<context::MEMS_Position> &pos_in,
+          Threading::FastIO<context::MEMS_Position> &pos_out) {
   // FCMP Field Buffer
   static fcmp_field_pos fcmp_position = {0};
   static fcmp_field_cfg fcmp_config = {0};
@@ -91,29 +92,30 @@ void mems(USB::SerialDevice &serial,
   std::thread recv([&]() { recv_thread(serial, pos_out); });
   // Infinite loop until closed
   try {
-    while (true) {
+    while (!flag_exit) {
       // Get next target position
       auto pos = pos_in.read();
       // Compute voltages
-      compute_channels(pos->x, fcmp_position.ch[0], fcmp_position.ch[1]);
-      compute_channels(pos->y, fcmp_position.ch[2], fcmp_position.ch[3]);
+      compute_channels(pos.x, fcmp_position.ch[0], fcmp_position.ch[1]);
+      compute_channels(pos.y, fcmp_position.ch[2], fcmp_position.ch[3]);
       // Send position until ACK
       bool flag_next = false;
-      while (!flag_next) {
-        std::cout << LOG_NAME " Sending position (" << pos->x << ", " << pos->y
-                  << ")" << std::endl;
+      while (!flag_next && !flag_exit) {
+        // std::cout << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+        //           << ")" << std::endl;
         // Send frame
         SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, fcmp_position);
         // Check for ACK
         std::unique_lock<std::mutex> lock(self.mutex);
-        while (self.ack == 0 && self.rej == 0)
-          self.updated.wait(lock);
+        while (self.ack == 0 && self.rej == 0 && !flag_exit) {
+          self.updated.wait_for(lock, std::chrono::milliseconds(100));
+        }
         flag_next = self.ack && !self.rej;
         self.ack = self.rej = 0;
         lock.unlock();
       }
     }
-  } catch (Threading::Closed &) {
+  } catch (Threading::END &) {
     // Normal termination
   } catch (std::runtime_error &e) {
     std::cerr << "[Thread::mems] " << e.what() << std::endl;
@@ -141,6 +143,12 @@ void mems(USB::SerialDevice &serial,
 #undef LOG_NAME
 #define LOG_NAME "[Thread::mems::recv]"
 
+namespace thread {
+
+Threading::FastIO<thread::FrameCounter> frame_counter;
+
+}
+
 void serial_read(USB::SerialDevice &device) {
   serial_rx.size = device.read((uint8_t *)serial_rx.buf, sizeof(serial_rx.buf),
                                serial_rx.size);
@@ -162,8 +170,10 @@ void serial_flush(USB::SerialDevice &device) {
 }
 
 void recv_thread(USB::SerialDevice &device,
-                 Threading::FlushingPipe<context::mems_position> &pos_out) {
+                 Threading::FastIO<context::MEMS_Position> &pos_out) {
   try {
+    unsigned count = 0;
+    thread::frame_counter.write(count);
     while (!flag_exit) {
       serial_read(device);
       // Decode COBS
@@ -203,18 +213,18 @@ void recv_thread(USB::SerialDevice &device,
                         << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
               continue;
             }
+            // Log timestamp of a successful ACK
+            thread::frame_counter.write(thread::FrameCounter{count++});
+            // std::cout << LOG_NAME " ACK:POS " << timestamp() << std::endl;
             { // Update acknowledge count
               std::lock_guard<std::mutex> lock(self.mutex);
               self.ack++;
               self.updated.notify_all();
             }
             // Push position to output pipe
-            context::mems_position next_pos;
-            next_pos.x =
-                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]);
-            next_pos.y =
-                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]);
-            pos_out.write(next_pos);
+            pos_out.write(context::MEMS_Position(
+                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
+                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3])));
           } else if (method == FCMP_METHOD_REJ) {
             { // Update rejection count
               std::lock_guard<std::mutex> lock(self.mutex);
@@ -237,7 +247,7 @@ void recv_thread(USB::SerialDevice &device,
         serial_flush(device);
       }
     }
-  } catch (Threading::Closed &) {
+  } catch (Threading::END &) {
     // Normal termination
   } catch (std::runtime_error &e) {
     std::cerr << LOG_NAME " " << e.what() << std::endl;

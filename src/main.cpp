@@ -2,22 +2,24 @@
 #include "threads.h"
 
 #include "graphics/canvas.h"
+#include "threading/fast_io.h"
 #include "threading/fifo.h"
-#include "threading/flushing_pipe.h"
 #include "usb/serial_device.h"
 #include "util/spinnaker.h"
 #include "util/vtconsole.h"
 
 #include <chrono>
+#include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <signal.h>
 #include <thread>
 // Create pipes
-Threading::FlushingPipe<cv::Mat> wide_view_pipe;
-std::vector<Threading::FlushingPipe<cv::Mat> *> fovea_pipes;
-Threading::FIFO<context::mems_position> pos_in(1);
-Threading::FlushingPipe<context::mems_position> pos_out;
+Threading::FastIO<cv::Mat> wide_view_pipe;
+std::vector<Threading::FastIO<cv::Mat> *> fovea_pipes;
+Threading::FIFO<context::MEMS_Position> pos_in;
+Threading::FastIO<context::MEMS_Position> pos_out;
 
 // Signal to kill all threads
 bool flag_exit = false;
@@ -25,6 +27,8 @@ bool flag_exit = false;
 #define NO_THROW(STATEMENT)                                                    \
   try {                                                                        \
     STATEMENT;                                                                 \
+  } catch (std::exception & e) {                                               \
+    std::cerr << "[" << __func__ << "] " << e.what() << std::endl;             \
   } catch (...) {                                                              \
   }
 
@@ -43,7 +47,15 @@ void close_all_pipes(int) {
   signal(SIGTERM, SIG_DFL);
 }
 
+namespace thread {
+
+ENV env;
+
+}
+
 int main() {
+  // Get env pointers
+  thread::env.FRAMERATE = std::getenv("FRAMERATE");
   // Register signal handler
   signal(SIGINT, close_all_pipes);
   signal(SIGKILL, close_all_pipes);
@@ -51,11 +63,13 @@ int main() {
   // Initialize serial port
   USB::SerialDevice mems(0x16c0, 0x0483);
   // Initialize cameras
+  std::cout << "[main] Looking for spinnaker cameras." << std::endl;
   auto spinnaker = Spinnaker::System::GetInstance();
   auto camList = spinnaker->GetCameras();
   Spinnaker::CameraPtr wide_camera(nullptr), fovea_camera(nullptr);
   for (unsigned idx = 0; idx < camList.GetSize(); idx++) {
     auto camera = camList[idx];
+    camera->Init();
     const auto model = std::string(camera->DeviceModelName().c_str());
     if (model.ends_with("BFS-U3-16S2C")) {
       // wide angle camera
@@ -64,6 +78,7 @@ int main() {
       // fovea camera
       fovea_camera = camera;
     }
+    camera->DeInit();
   }
   if (wide_camera == nullptr || fovea_camera == nullptr) {
     std::cerr << "[main] Unable to find cameras." << std::endl;
@@ -73,7 +88,7 @@ int main() {
   }
   // Multiplex 4 streams
   for (unsigned i = 0; i < 4; i++) {
-    fovea_pipes.push_back(new Threading::FlushingPipe<cv::Mat>());
+    fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
   }
   // Begin acquisition
   std::vector<std::thread> thread_list;
@@ -93,30 +108,29 @@ int main() {
       std::thread([&]() { thread::mems(mems, pos_in, pos_out); }));
   // Send positions
   try {
-    context::mems_position pos;
-    float k = 1.0;
-    for (double y = -60.0; y < 60.0; y += 1.0) {
-      for (double x = 60.0; x > -60.0; x -= 1.0) {
-        pos.x = x * k;
-        pos.y = y;
-        pos_in.write(pos);
-      }
-      k = -k;
+    for (double offset = 80.0; offset > -80.0; offset -= 1) {
+      // // for (double y = -60.0; y < 60.0; y += 1.0) {
+      // // for (double x = 60.0; x > -60.0; x -= 1.0) {
+      pos_in.write(context::MEMS_Position(offset, -offset * 0.75));  // 3
+      pos_in.write(context::MEMS_Position(-offset, offset * 0.75));  // 2
+      pos_in.write(context::MEMS_Position(offset, offset * 0.75));   // 1
+      pos_in.write(context::MEMS_Position(-offset, -offset * 0.75)); // 4
     }
-    pos.x = 0;
-    pos.y = 0;
-    pos_in.write(pos);
-  } catch (Threading::Closed &) {
+    // }
+    // }
+    pos_in.write(context::MEMS_Position(0, 0));
+  } catch (Threading::END &) {
     // Normal termination
   }
-  NO_THROW(pos_in.close());
+  // Close position pipe upon fifo emptied
+  NO_THROW(pos_in.close(true));
   // Wait for threads to terminate
   for (auto &thread : thread_list) {
     thread.join();
   }
   // Release resources
-  camList.Clear();
-  spinnaker->ReleaseInstance();
+  NO_THROW(camList.Clear());
+  NO_THROW(spinnaker->ReleaseInstance());
   std::cout << "[main] terminated." << std::endl;
   return 0;
 }
