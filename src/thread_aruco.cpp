@@ -48,7 +48,7 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
         std::vector<std::vector<cv::Point2f>> corners;
         cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
         cv::aruco::detectMarkers(img_test_gray, dictionary, corners, ids);
-        
+
         // if at least one marker detected
         if (ids.size() > 0){
           float x_center = 0, y_center = 0;
@@ -58,6 +58,10 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
           }
           x_center /= 4;
           y_center /= 4;
+
+          // Making the coordinates relative to the center of the image
+          x_center -= image.cols / 2;
+          y_center -= image.rows / 2;
 
           // todo: update to handle more than one marker
           info[0].x = x_center;
