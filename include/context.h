@@ -17,4 +17,11 @@ public:
   }
 };
 
+typedef struct {
+  // ArUco marker ID embedded in the image
+  unsigned id;
+  // Center Position of the detected marker
+  double x, y;
+} ArUcoInfo;
+
 } // namespace context

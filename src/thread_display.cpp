@@ -1,5 +1,6 @@
-#include "graphics/canvas.h"
 #include "threads.h"
+
+#include "graphics/canvas.h"
 #include "util/assert.h"
 #include "util/vtconsole.h"
 #include <memory>
