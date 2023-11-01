@@ -26,7 +26,7 @@ uint16_t SyncWindow::tag() { return _tag; }
  * Recommended: use exposure time in us as offset
  */
 int SyncWindow::test(const unsigned long time, const unsigned long offset) {
-  if (delay > 0 && time < delay) {
+  if (delay > 0 && (signed)time < delay) {
     return -1;
   }
   const auto real_time = time - delay;

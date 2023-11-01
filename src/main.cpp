@@ -18,8 +18,8 @@
 // Create pipes
 Threading::FastIO<cv::Mat> wide_view_pipe;
 std::vector<Threading::FastIO<cv::Mat> *> fovea_pipes;
-Threading::FIFO<context::MEMS_Position> pos_in;
-Threading::FastIO<context::MEMS_Position> pos_out;
+Threading::FIFO<context::MEMS_Position> pos_next;
+Threading::FastIO<context::MEMS_Position> pos_back;
 
 #define NO_THROW(STATEMENT)                                                    \
   try {                                                                        \
@@ -36,15 +36,16 @@ void close_all_pipes(int) {
   for (auto &pipe : fovea_pipes) {
     NO_THROW(pipe->close());
   }
-  NO_THROW(pos_in.close());
-  NO_THROW(pos_out.close());
+  NO_THROW(pos_next.close());
+  NO_THROW(pos_back.close());
   // Restore all signals to default
   signal(SIGINT, SIG_DFL);
   signal(SIGKILL, SIG_DFL);
   signal(SIGTERM, SIG_DFL);
 }
 
-int main() {
+int main(int argc, char **argv) {
+  const auto task = argc > 1 ? std::string(argv[1]) : std::string{"move"};
   // Get env pointers
   thread::env.FRAMERATE = std::getenv("FRAMERATE");
   // Register signal handler
@@ -82,8 +83,6 @@ int main() {
     fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
   }
 
-  Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_out_pipe;
-
   // Begin acquisition
   std::vector<std::thread> thread_list;
   // Display Thread
@@ -94,42 +93,51 @@ int main() {
       std::thread([&]() { thread::capture(wide_camera, wide_view_pipe); }));
   thread_list.push_back(
       std::thread([&]() { thread::capture(fovea_camera, fovea_pipes); }));
-  // Stack Thread
-  // thread_list.push_back(
-  //     std::thread([&]() { thread::stack(img_pipe[2], img_pipe[1], 8); }));
-  // Aruco detection thread
-  thread_list.push_back(
-    std::thread([&]() { thread::aruco(wide_view_pipe, aruco_out_pipe); }));
   // MEMS Thread
   thread_list.push_back(
-      std::thread([&]() { thread::mems(mems, pos_in, pos_out); }));
-  // Send positions
-  try {
-    // Broadcast idle position
-    pos_in.write(context::MEMS_Position(0, 0));
-    pos_in.write(context::MEMS_Position(0, 0));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    double step = 1.0, pos = 0.0;
-    while (true) {
-      pos += step;
-      if (pos >= 80.0)
-        step = -1.0;
-      if (step < 0.0 && pos <= 0.0)
-        break;
-      pos_in.write(context::MEMS_Position(pos, pos, 2));
-      pos_in.write(context::MEMS_Position(-pos, pos, 1));
-      pos_in.write(context::MEMS_Position(-pos, -pos, 3));
-      pos_in.write(context::MEMS_Position(pos, -pos, 4));
+      std::thread([&]() { thread::mems(mems, pos_next, pos_back); }));
+  // Task specific threads
+  if (task == "move") {
+    // Send positions
+    try {
+      // Broadcast idle position
+      pos_next.write(context::MEMS_Position(0, 0));
+      pos_next.write(context::MEMS_Position(0, 0));
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      double step = 1.0, pos = 0.0;
+      while (true) {
+        pos += step;
+        if (pos >= 80.0)
+          step = -1.0;
+        if (step < 0.0 && pos <= 0.0)
+          break;
+        pos_next.write({pos, pos, 2});
+        pos_next.write({-pos, pos, 1});
+        pos_next.write({-pos, -pos, 3});
+        pos_next.write({pos, -pos, 4});
+      }
+      // Broadcast idle position
+      pos_next.write(context::MEMS_Position(0, 0));
+      pos_next.write(context::MEMS_Position(0, 0));
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    } catch (Threading::END &) {
+      // Normal termination
     }
-    // Broadcast idle position
-    pos_in.write(context::MEMS_Position(0, 0));
-    pos_in.write(context::MEMS_Position(0, 0));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-  } catch (Threading::END &) {
-    // Normal termination
+    // Close position pipe upon fifo emptied
+    NO_THROW(pos_next.close(true));
+  } else if (task == "track") {
+    Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_pos_pipe;
+    // Aruco detection thread
+    thread_list.push_back(
+        std::thread([&]() { thread::aruco(wide_view_pipe, aruco_pos_pipe); }));
+    // Tracking thread
+    thread_list.push_back(std::thread(
+        [&]() { thread::track_pid(aruco_pos_pipe, pos_next, pos_back); }));
+  } else {
+    std::cerr << "[main] Unknown task: " << task << std::endl;
+    return -1;
   }
-  // Close position pipe upon fifo emptied
-  NO_THROW(pos_in.close(true));
+  Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_out_pipe;
   // Wait for threads to terminate
   for (auto &thread : thread_list) {
     thread.join();

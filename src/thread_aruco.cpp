@@ -3,17 +3,18 @@
 
 #include "graphics/canvas.h"
 #include "util/assert.h"
-#include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
+#include <opencv2/opencv.hpp>
 
 namespace thread {
 
 #undef LOGNAME
 #define LOGNAME "thread::aruco"
 
-void generateArucoMarker(){
+void generateArucoMarker() {
   cv::Mat markerImage;
-  cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+  cv::Ptr<cv::aruco::Dictionary> dictionary =
+      cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
   cv::aruco::drawMarker(dictionary, 23, 200, markerImage, 1);
   cv::imwrite("/home/brevin/FoveaCam/marker23.png", markerImage);
 }
@@ -21,7 +22,7 @@ void generateArucoMarker(){
 bool save_test = true;
 
 void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FIFO<std::vector<context::ArUcoInfo>>& pipe_info_out) {
+           Threading::FIFO<std::vector<context::ArUcoInfo>> &pipe_info_out) {
   try {
     std::shared_ptr<const cv::Mat> prev_ptr = nullptr;
     while (!flag_exit) {
@@ -38,7 +39,7 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
         cv::Mat img_test = next_ptr->clone();
         cv::Mat img_test_gray;
         cv::cvtColor(img_test, img_test_gray, cv::COLOR_RGBA2GRAY);
-        //cv::imwrite("/home/brevin/FoveaCam/test.png", img_test_gray);
+        // cv::imwrite("/home/brevin/FoveaCam/test.png", img_test_gray);
         cv::flip(img_test_gray, img_test_gray, 1);
 
         // The list of all detected markers
@@ -46,21 +47,23 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
         // Do the detection
         std::vector<int> ids;
         std::vector<std::vector<cv::Point2f>> corners;
-        cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+        cv::Ptr<cv::aruco::Dictionary> dictionary =
+            cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
         cv::aruco::detectMarkers(img_test_gray, dictionary, corners, ids);
 
         // if at least one marker detected
-        if (ids.size() > 0){
+        if (ids.size() > 0) {
           float x_center = 0, y_center = 0;
-          for (const auto& point : corners[0]) {
-              x_center += point.x;
-              y_center += point.y;
+          for (const auto &point : corners[0]) {
+            x_center += point.x;
+            y_center += point.y;
           }
           x_center /= 4;
           y_center /= 4;
 
-          // draw center 
-          // cv::circle(img_test_gray, cv::Point2f(x_center, y_center), 4, cv::Scalar(0, 255, 0), -1);
+          // draw center
+          // cv::circle(img_test_gray, cv::Point2f(x_center, y_center), 4,
+          // cv::Scalar(0, 255, 0), -1);
 
           // Making the coordinates relative to the center of the image
           x_center -= img_test_gray.cols / 2;
@@ -74,11 +77,10 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
           // Do something with the center, e.g., draw a circle at the center
           // cv::aruco::drawDetectedMarkers(img_test_gray, corners, ids);
           std::cout << LOGNAME "num markers: " << ids.size() << std::endl;
-          std::cout << LOGNAME "num corners: " << corners[0].size() << std::endl; 
+          std::cout << LOGNAME "num corners: " << corners[0].size()
+                    << std::endl;
 
-
-        }
-        else{
+        } else {
           std::cout << LOGNAME "No marker detected" << std::endl;
         }
         // if(save_test)
@@ -92,7 +94,7 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
         pipe_info_out.write(info);
       }
     };
-  } catch (Threading::END) {
+  } catch (Threading::END &e) {
   } catch (std::exception &e) {
     std::cerr << LOGNAME " " << e.what() << std::endl;
   }
