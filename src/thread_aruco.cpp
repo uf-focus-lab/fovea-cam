@@ -59,9 +59,12 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
           x_center /= 4;
           y_center /= 4;
 
+          // draw center 
+          // cv::circle(img_test_gray, cv::Point2f(x_center, y_center), 4, cv::Scalar(0, 255, 0), -1);
+
           // Making the coordinates relative to the center of the image
-          x_center -= image.cols / 2;
-          y_center -= image.rows / 2;
+          x_center -= img_test_gray.cols / 2;
+          y_center -= img_test_gray.rows / 2;
 
           // todo: update to handle more than one marker
           info[0].x = x_center;
@@ -69,10 +72,9 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
           info[0].id = 0;
 
           // Do something with the center, e.g., draw a circle at the center
-          cv::circle(img_test_gray, cv::Point2f(x_center, y_center), 4, cv::Scalar(0, 255, 0), -1);
-            cv::aruco::drawDetectedMarkers(img_test_gray, corners, ids);
-            std::cout << LOGNAME "num markers: " << ids.size() << std::endl;
-            std::cout << LOGNAME "num corners: " << corners[0].size() << std::endl; 
+          // cv::aruco::drawDetectedMarkers(img_test_gray, corners, ids);
+          std::cout << LOGNAME "num markers: " << ids.size() << std::endl;
+          std::cout << LOGNAME "num corners: " << corners[0].size() << std::endl; 
 
 
         }
