@@ -27,4 +27,7 @@ void mems(USB::SerialDevice &device,
           Threading::FIFO<context::MEMS_Position> &pos_in,
           Threading::FastIO<context::MEMS_Position> &pos_out);
 
+void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
+           Threading::FIFO<std::vector<context::ArUcoInfo>> &pipe_info_out);
+
 } // namespace thread

@@ -47,7 +47,7 @@ void configure(Spinnaker::CameraPtr &camera,
 
     map.set("ExposureAuto", "Off");
     // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
-    map.set("ExposureTime", is_zoom_camera ? 10.0 * 1000.0 : 1000.0);
+    map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 50*1000.0);
     map.set("GainAuto", "Off");
     map.set("Gain", is_zoom_camera ? 0.0 : 0.0);
     // Image format

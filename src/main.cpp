@@ -81,6 +81,9 @@ int main() {
   for (unsigned i = 0; i < 4; i++) {
     fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
   }
+
+  Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_out_pipe;
+
   // Begin acquisition
   std::vector<std::thread> thread_list;
   // Display Thread
@@ -94,6 +97,9 @@ int main() {
   // Stack Thread
   // thread_list.push_back(
   //     std::thread([&]() { thread::stack(img_pipe[2], img_pipe[1], 8); }));
+  // Aruco detection thread
+  thread_list.push_back(
+    std::thread([&]() { thread::aruco(wide_view_pipe, aruco_out_pipe); }));
   // MEMS Thread
   thread_list.push_back(
       std::thread([&]() { thread::mems(mems, pos_in, pos_out); }));
