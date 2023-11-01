@@ -58,7 +58,7 @@ target_link_libraries(${PROJECT_NAME}
   Threads::Threads
   ${OpenCV_LIBS}
   ${Spinnaker_LIBRARIES}
-  argparse
+  # argparse
   CppLinuxSerial::CppLinuxSerial
   ${libusb-1.0_LIBRARIES}
 )
