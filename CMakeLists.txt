@@ -22,19 +22,19 @@ find_package(Threads REQUIRED)
 find_package(Spinnaker REQUIRED)
 find_package(CppLinuxSerial REQUIRED)
 # fetch latest argparse
-include(FetchContent)
-FetchContent_Declare(
-    argparse
-    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
-)
-FetchContent_MakeAvailable(argparse)
-add_compile_definitions(ARGPARSE_BUILD_TESTS=off)
-add_compile_definitions(ARGPARSE_BUILD_SAMPLES=off)
-set_target_properties(
-  ARGPARSE_TESTS
-  PROPERTIES
-  EXCLUDE_FROM_ALL 1
-)
+# include(FetchContent)
+# FetchContent_Declare(
+#     argparse
+#     GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+# )
+# FetchContent_MakeAvailable(argparse)
+# add_compile_definitions(ARGPARSE_BUILD_TESTS=off)
+# add_compile_definitions(ARGPARSE_BUILD_SAMPLES=off)
+# set_target_properties(
+#   ARGPARSE_TESTS
+#   PROPERTIES
+#   EXCLUDE_FROM_ALL 1
+# )
 # header files and libraries
 include_directories(
   ${PROJECT_ROOT}/include/
