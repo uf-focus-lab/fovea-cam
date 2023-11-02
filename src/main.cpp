@@ -86,33 +86,35 @@ int main(int argc, char **argv) {
     for (unsigned i = 0; i < 4; i++) {
       fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
     }
-    // Send positions
-    try {
-      // Broadcast idle position
-      pos_next.write(context::MEMS_Position(0, 0));
-      pos_next.write(context::MEMS_Position(0, 0));
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-      double step = 1.0, pos = 0.0;
-      while (true) {
-        pos += step;
-        if (pos >= 80.0)
-          step = -1.0;
-        if (step < 0.0 && pos <= 0.0)
-          break;
-        pos_next.write({pos, pos, 2});
-        pos_next.write({-pos, pos, 1});
-        pos_next.write({-pos, -pos, 3});
-        pos_next.write({pos, -pos, 4});
+    // Send positions in new thread
+    threads.push_back(std::thread([&]() {
+      try {
+        // Broadcast idle position
+        pos_next.write(context::MEMS_Position(0, 0));
+        pos_next.write(context::MEMS_Position(0, 0));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        double step = 1.0, pos = 0.0;
+        while (true) {
+          pos += step;
+          if (pos >= 80.0)
+            step = -1.0;
+          if (step < 0.0 && pos <= 0.0)
+            break;
+          pos_next.write({pos, pos, 2});
+          pos_next.write({-pos, pos, 1});
+          pos_next.write({-pos, -pos, 3});
+          pos_next.write({pos, -pos, 4});
+        }
+        // Broadcast idle position
+        pos_next.write(context::MEMS_Position(0, 0));
+        pos_next.write(context::MEMS_Position(0, 0));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      } catch (Threading::END &) {
+        // Normal termination
       }
-      // Broadcast idle position
-      pos_next.write(context::MEMS_Position(0, 0));
-      pos_next.write(context::MEMS_Position(0, 0));
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-    } catch (Threading::END &) {
-      // Normal termination
-    }
-    // Close position pipe upon fifo emptied
-    NO_THROW(pos_next.close(true));
+      // Close position pipe upon fifo emptied
+      NO_THROW(pos_next.close(true));
+    }));
   } else if (task == "track") {
     // Create 1 stream for fovea
     fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
