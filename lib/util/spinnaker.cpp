@@ -44,7 +44,7 @@ PixFormatLUT convertPixelFormat(Spinnaker::ImagePtr &image_ptr) {
 
 namespace Spinnaker {
 
-cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
+cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr, int flip) {
   const unsigned int width = image_ptr->GetWidth(),
                      height = image_ptr->GetHeight();
   const auto fmt = convertPixelFormat(image_ptr);
@@ -57,6 +57,9 @@ cv::Mat fromImagePtr(Spinnaker::ImagePtr image_ptr) {
     cv::Mat tmp;
     mat.convertTo(tmp, 8);
     mat = tmp;
+  }
+  if (flip) {
+    cv::flip(mat, mat, flip);
   }
   return mat;
 }

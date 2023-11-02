@@ -47,9 +47,9 @@ void configure(Spinnaker::CameraPtr &camera,
 
     map.set("ExposureAuto", "Off");
     // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
-    map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 50*1000.0);
+    map.set("ExposureTime", is_zoom_camera ? 33.0 * 1000.0 : 10 * 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 0.0 : 0.0);
+    map.set("Gain", is_zoom_camera ? 10.0 : 0.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -93,12 +93,11 @@ void capture(Spinnaker::CameraPtr &camera,
       }
       // Use the sync window to determine the position tag
       const auto tag = sync_window->tag();
-
       // std::cerr << LOGNAME " Got tag (" << tag << ")" << std::endl;
       if (tag == 0) {
         // BroadCast
-        auto mat_ptr =
-            std::make_shared<const cv::Mat>(Spinnaker::fromImagePtr(img_ptr));
+        auto mat_ptr = std::make_shared<const cv::Mat>(
+            Spinnaker::fromImagePtr(img_ptr, 1));
         for (auto &pipe : pipes_out)
           pipe->write(mat_ptr);
       } else if (tag <= pipes_out.size()) {
@@ -145,7 +144,7 @@ void capture(Spinnaker::CameraPtr &camera,
   try {
     while (1) {
       auto img_ptr = camera->GetNextImage();
-      pipe_out.write(Spinnaker::fromImagePtr(img_ptr));
+      pipe_out.write(Spinnaker::fromImagePtr(img_ptr, 1));
     }
   } catch (Threading::END &e) {
     // Normal termination

@@ -47,7 +47,7 @@ void close_all_pipes(int) {
 int main(int argc, char **argv) {
   const auto task = argc > 1 ? std::string(argv[1]) : std::string{"move"};
   // Get env pointers
-  thread::env.FRAMERATE = std::getenv("FRAMERATE");
+  thread::env.FRAMERATE = std::getenv("FPS");
   // Register signal handler
   signal(SIGINT, close_all_pipes);
   signal(SIGKILL, close_all_pipes);
@@ -78,26 +78,14 @@ int main(int argc, char **argv) {
     spinnaker->ReleaseInstance();
     return -1;
   }
-  // Multiplex 4 streams
-  for (unsigned i = 0; i < 4; i++) {
-    fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
-  }
-
   // Begin acquisition
-  std::vector<std::thread> thread_list;
-  // Display Thread
-  thread_list.push_back(
-      std::thread([&]() { thread::display(wide_view_pipe, fovea_pipes); }));
-  // Capture Threads
-  thread_list.push_back(
-      std::thread([&]() { thread::capture(wide_camera, wide_view_pipe); }));
-  thread_list.push_back(
-      std::thread([&]() { thread::capture(fovea_camera, fovea_pipes); }));
-  // MEMS Thread
-  thread_list.push_back(
-      std::thread([&]() { thread::mems(mems, pos_next, pos_back); }));
+  std::vector<std::thread> threads;
   // Task specific threads
   if (task == "move") {
+    // Multiplex 4 streams
+    for (unsigned i = 0; i < 4; i++) {
+      fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
+    }
     // Send positions
     try {
       // Broadcast idle position
@@ -126,20 +114,37 @@ int main(int argc, char **argv) {
     // Close position pipe upon fifo emptied
     NO_THROW(pos_next.close(true));
   } else if (task == "track") {
-    Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_pos_pipe;
+    // Create 1 stream for fovea
+    fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
+    // Create control pipes
+    Threading::FIFO<std::vector<context::ArUcoInfo>> wide_aruco_pos_pipe,
+        fovea_aruco_pos_pipe;
     // Aruco detection thread
-    thread_list.push_back(
-        std::thread([&]() { thread::aruco(wide_view_pipe, aruco_pos_pipe); }));
+    // threads.push_back(std::thread(
+    //     [&]() { thread::aruco(wide_view_pipe, wide_aruco_pos_pipe); }));
+    threads.push_back(std::thread(
+        [&]() { thread::aruco(*fovea_pipes[0], fovea_aruco_pos_pipe); }));
     // Tracking thread
-    thread_list.push_back(std::thread(
-        [&]() { thread::track_pid(aruco_pos_pipe, pos_next, pos_back); }));
+    threads.push_back(std::thread([&]() {
+      thread::track_pid(fovea_aruco_pos_pipe, pos_next, pos_back);
+    }));
   } else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
     return -1;
   }
-  Threading::FIFO<std::vector<context::ArUcoInfo>> aruco_out_pipe;
+  // Display Thread
+  threads.push_back(
+      std::thread([&]() { thread::display(wide_view_pipe, fovea_pipes); }));
+  // Capture Threads
+  threads.push_back(
+      std::thread([&]() { thread::capture(wide_camera, wide_view_pipe); }));
+  threads.push_back(
+      std::thread([&]() { thread::capture(fovea_camera, fovea_pipes); }));
+  // MEMS Thread
+  threads.push_back(
+      std::thread([&]() { thread::mems(mems, pos_next, pos_back); }));
   // Wait for threads to terminate
-  for (auto &thread : thread_list) {
+  for (auto &thread : threads) {
     thread.join();
   }
   // Release resources

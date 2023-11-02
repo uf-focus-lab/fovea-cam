@@ -100,8 +100,8 @@ void mems(USB::SerialDevice &serial,
       // Send position until ACK
       bool flag_next = false;
       while (!flag_next && !flag_exit) {
-        // std::cout << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
-        //           << ")" << std::endl;
+        std::cout << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+                  << ")" << std::endl;
         // Send frame
         SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
         // Check for ACK

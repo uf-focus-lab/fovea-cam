@@ -31,8 +31,8 @@ int SyncWindow::test(const unsigned long time, const unsigned long offset) {
   }
   const auto real_time = time - delay;
   if (real_time < window.open) {
-    std::cerr << "[mems::sync] " << ms_cap(window.open - real_time)
-              << " ms ::|<-" << std::endl;
+    // std::cerr << "[mems::sync] " << ms_cap(window.open - real_time)
+    //           << " ms ::|<-" << std::endl;
     // Sync window has not opened yet.
     return -1;
   } else if (closed && real_time > window.close) {
@@ -41,14 +41,14 @@ int SyncWindow::test(const unsigned long time, const unsigned long offset) {
   } else {
     // if ((real_time - window.open) > 10 * 1000) {
     // Log the abnormal delay
-    if (closed) {
-      std::cerr << "[mems::sync] ::|<-" << ms_cap(real_time - window.open)
-                << "ms : " << ms_cap(window.close - real_time)
-                << "ms->|::" << std::endl;
-    } else {
-      std::cerr << "[mems::sync] ::|<-" << ms_cap(real_time - window.open)
-                << "ms : ******ms->|::" << std::endl;
-    }
+    // if (closed) {
+    //   std::cerr << "[mems::sync] ::|<-" << ms_cap(real_time - window.open)
+    //             << "ms : " << ms_cap(window.close - real_time)
+    //             << "ms->|::" << std::endl;
+    // } else {
+    //   std::cerr << "[mems::sync] ::|<-" << ms_cap(real_time - window.open)
+    //             << "ms : ******ms->|::" << std::endl;
+    // }
     // }
     return 0;
   }

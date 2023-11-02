@@ -5,13 +5,6 @@
 #include "util/vtconsole.h"
 #include <memory>
 
-void render(canvas::Canvas &canvas, std::shared_ptr<const cv::Mat> frame,
-            cv::Rect tile) {
-  cv::Mat tmp;
-  cv::flip(*frame, tmp, 1);
-  canvas.show(tmp, tile);
-}
-
 namespace thread {
 
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
@@ -29,16 +22,26 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     std::shared_ptr<const cv::Mat> wide_ptr = nullptr;
     std::vector<std::shared_ptr<const cv::Mat>> fovea_ptrs;
     // Prepare display areas
-    const unsigned w = canvas.shape().w, h = canvas.shape().h / 3;
-    static const unsigned pad = 20;
-    cv::Rect wide_view_tile = cv::Rect(0, 0, w, h);
+    cv::Rect wide_view_tile;
     std::vector<cv::Rect> fovea_tiles;
-    for (unsigned int i = 0; i < pipe_tile_b.size(); i++) {
-      const unsigned row = i / 2, col = i % 2;
-      const unsigned x = col ? ((w / 2) + pad * 2) : 0;
-      fovea_ptrs.push_back(nullptr);
-      fovea_tiles.push_back(
-          cv::Rect(x, h * (row + 1) + pad, (w / 2) - pad, h - pad));
+    static const unsigned pad = 20;
+    const unsigned num_tiles = pipe_tile_b.size(),
+                   num_cols = num_tiles > 1 ? 1 : 2,
+                   num_rows = (num_tiles + 1) / num_cols;
+    const unsigned w = canvas.shape().w, h = canvas.shape().h / (num_rows + 1);
+    wide_view_tile =
+        num_cols > 1 ? cv::Rect(0, 0, w, h) : cv::Rect(0, 0, w, h - pad);
+    for (unsigned row = 0; row < num_rows; row++) {
+      for (unsigned col = 0; col < num_cols; col++) {
+        fovea_ptrs.push_back(nullptr);
+        if (num_rows == 1) {
+          fovea_tiles.push_back(cv::Rect(0, h + pad, w, h - pad));
+        } else {
+          const unsigned x = num_cols > 1 ? (col ? ((w / 2) + pad * 2) : 0) : 0;
+          fovea_tiles.push_back(
+              cv::Rect(x, h * (row + 1) + pad, (w / 2) - pad, h - pad));
+        }
+      }
     }
     try {
       while (1) {
@@ -50,7 +53,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
             continue; // Same Data
           // Update pointer and render to canvas
           wide_ptr = next_ptr;
-          render(canvas, wide_ptr, wide_view_tile);
+          canvas.show(*wide_ptr, wide_view_tile);
         }
         for (unsigned int i = 0; i < pipe_tile_b.size(); i++) { // Fovea streams
           auto next_ptr = pipe_tile_b[i]->read();
@@ -58,9 +61,10 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
             continue; // No Data Available
           if (next_ptr == fovea_ptrs[i])
             continue; // Same Data
-          // Update pointer and render to canvas
-          wide_ptr = next_ptr;
-          render(canvas, wide_ptr, fovea_tiles[i]);
+          // Render to canvas
+          canvas.show(*next_ptr, fovea_tiles[i]);
+          // Update pointer
+          fovea_ptrs[i] = next_ptr;
         }
         canvas.apply();
       }

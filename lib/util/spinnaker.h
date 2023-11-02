@@ -18,7 +18,7 @@
 
 namespace Spinnaker {
 
-cv::Mat fromImagePtr(ImagePtr image_ptr);
+cv::Mat fromImagePtr(ImagePtr image_ptr, int flip = 0);
 
 class ConfigurableMap {
   GenApi::INodeMap &map;
