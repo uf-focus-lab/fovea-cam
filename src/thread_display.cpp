@@ -31,6 +31,8 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     const unsigned w = canvas.shape().w, h = canvas.shape().h / (num_rows + 1);
     wide_view_tile =
         num_cols > 1 ? cv::Rect(0, 0, w, h) : cv::Rect(0, 0, w, h - pad);
+    std::cout << "[thread::display] " << num_cols << "x" << num_rows
+              << " fovea tiles." << std::endl;
     for (unsigned row = 0; row < num_rows; row++) {
       for (unsigned col = 0; col < num_cols; col++) {
         fovea_ptrs.push_back(nullptr);
@@ -40,8 +42,8 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
           fovea_tiles.push_back(
               cv::Rect(0, h * (row + 1) + pad, (w / 2) - pad, h - pad));
         } else if (col == 1) {
-          fovea_tiles.push_back(
-              cv::Rect(w + pad, h * (row + 1) + pad, (w / 2) - pad, h - pad));
+          fovea_tiles.push_back(cv::Rect(w / 2 + pad, h * (row + 1) + pad,
+                                         (w / 2) - pad, h - pad));
         }
       }
     }
@@ -73,7 +75,13 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     } catch (Threading::END &e) {
       // Normal termination
     }
-    CATCH_ASSERT(;);
+    CATCH_ASSERT(;)
+    catch (std::exception &e) {
+      std::cerr << "[thread::display] " << e.what() << std::endl;
+    }
+    catch (...) {
+      std::cerr << "[thread::display] Unknown exception." << std::endl;
+    };
     // Restore splash screen
     canvas.clear().show(splash).apply();
   } catch (std::exception &e) {
