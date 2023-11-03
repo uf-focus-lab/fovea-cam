@@ -27,7 +27,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     static const unsigned pad = 20;
     const unsigned num_tiles = pipe_tile_b.size(),
                    num_cols = num_tiles <= 1 ? 1 : 2,
-                   num_rows = (num_tiles + 1) / num_cols;
+                   num_rows = (num_tiles / num_cols) + 1;
     const unsigned w = canvas.shape().w, h = canvas.shape().h / (num_rows + 1);
     wide_view_tile =
         num_cols > 1 ? cv::Rect(0, 0, w, h) : cv::Rect(0, 0, w, h - pad);
