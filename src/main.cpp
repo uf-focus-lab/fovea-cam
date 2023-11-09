@@ -30,7 +30,7 @@ Threading::FastIO<context::MEMS_Position> pos_back;
   }
 
 void close_all_pipes(int) {
-  std::cout << std::endl;
+  std::cerr << std::endl;
   thread::flag_exit = true;
   NO_THROW(wide_view_pipe.close());
   for (auto &pipe : fovea_pipes) {
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   // Initialize serial port
   USB::SerialDevice mems(0x16c0, 0x0483);
   // Initialize cameras
-  std::cout << "[main] Looking for spinnaker cameras." << std::endl;
+  std::cerr << "[main] Looking for spinnaker cameras." << std::endl;
   auto spinnaker = Spinnaker::System::GetInstance();
   auto camList = spinnaker->GetCameras();
   Spinnaker::CameraPtr wide_camera(nullptr), fovea_camera(nullptr);
@@ -119,16 +119,20 @@ int main(int argc, char **argv) {
     // Create 1 stream for fovea
     fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
     // Create control pipes
-    Threading::FIFO<std::vector<context::ArUcoInfo>> wide_aruco_pos_pipe,
+    Threading::FastIO<std::vector<context::ArUcoInfo>>
+        // Wide angle -> aruco position
+        wide_aruco_pos_pipe,
+        // Fovea -> aruco position
         fovea_aruco_pos_pipe;
     // Aruco detection thread
-    // threads.push_back(std::thread(
-    //     [&]() { thread::aruco(wide_view_pipe, wide_aruco_pos_pipe); }));
+    threads.push_back(std::thread(
+        [&]() { thread::aruco(wide_view_pipe, wide_aruco_pos_pipe); }));
     threads.push_back(std::thread(
         [&]() { thread::aruco(*fovea_pipes[0], fovea_aruco_pos_pipe); }));
     // Tracking thread
     threads.push_back(std::thread([&]() {
-      thread::track_pid(fovea_aruco_pos_pipe, pos_next, pos_back);
+      thread::track_pid(wide_aruco_pos_pipe, fovea_aruco_pos_pipe, pos_next,
+                        pos_back);
     }));
   } else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
@@ -152,6 +156,6 @@ int main(int argc, char **argv) {
   // Release resources
   NO_THROW(camList.Clear());
   NO_THROW(spinnaker->ReleaseInstance());
-  std::cout << "[main] terminated." << std::endl;
+  std::cerr << "[main] terminated." << std::endl;
   return 0;
 }

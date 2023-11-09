@@ -20,7 +20,6 @@ pkg_check_modules(libusb-1.0 REQUIRED libusb-1.0)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Spinnaker REQUIRED)
-find_package(CppLinuxSerial REQUIRED)
 # fetch latest argparse
 # include(FetchContent)
 # FetchContent_Declare(
@@ -59,6 +58,5 @@ target_link_libraries(${PROJECT_NAME}
   ${OpenCV_LIBS}
   ${Spinnaker_LIBRARIES}
   # argparse
-  CppLinuxSerial::CppLinuxSerial
   ${libusb-1.0_LIBRARIES}
 )

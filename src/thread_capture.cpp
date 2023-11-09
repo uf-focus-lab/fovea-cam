@@ -18,7 +18,7 @@ void configure(Spinnaker::CameraPtr &camera,
                const bool is_zoom_camera = false) {
   camera->Init();
   std::lock_guard<std::mutex> lock(configure_mutex);
-  std::cout << LOGNAME " Setting up " << camera->DeviceModelName().c_str()
+  std::cerr << LOGNAME " Setting up " << camera->DeviceModelName().c_str()
             << std::endl;
   { // Camera parameters
     auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
@@ -36,7 +36,7 @@ void configure(Spinnaker::CameraPtr &camera,
     if (thread::env.FRAMERATE) {
       const auto env_rate = std::string(thread::env.FRAMERATE);
       const double rate = std::stod(env_rate);
-      std::cout << "[thread::capture] Setting framerate to " << rate
+      std::cerr << "[thread::capture] Setting framerate to " << rate
                 << " (raw: " << env_rate << ")" << std::endl;
       ASSERT(rate > 0.0, "Invalid framerate");
       map.set("AcquisitionFrameRateEnable", true);
@@ -128,7 +128,7 @@ void capture(Spinnaker::CameraPtr &camera,
   } catch (Spinnaker::Exception &e) {
     std::cerr << LOGNAME "Error: " << e.what() << std::endl;
   }
-  std::cout << LOGNAME " terminated." << std::endl;
+  std::cerr << LOGNAME " terminated." << std::endl;
 }
 
 void capture(Spinnaker::CameraPtr &camera,
@@ -161,7 +161,7 @@ void capture(Spinnaker::CameraPtr &camera,
   } catch (Spinnaker::Exception &e) {
     std::cerr << LOGNAME "Error: " << e.what() << std::endl;
   }
-  std::cout << LOGNAME " terminated." << std::endl;
+  std::cerr << LOGNAME " terminated." << std::endl;
 }
 
 } // namespace thread

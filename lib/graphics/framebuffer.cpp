@@ -21,7 +21,7 @@ void FrameBuffer::init_fd(std::string path) {
   /* Open the file for reading and writing */
   fd = open(path.c_str(), O_RDWR | O_SYNC);
   CHECK(fd >= 0);
-  std::cout << "Successfully opened " << path << std::endl;
+  std::cerr << "Successfully opened " << path << std::endl;
   /* Get finfo and vinfo from fd */
   CHECK(ioctl(fd, FBIOGET_FSCREENINFO, &finfo) == 0);
   CHECK(ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) == 0);
@@ -66,7 +66,7 @@ FrameBuffer::FrameBuffer(std::string path) {
   buffer_init();
   // memset(framebuffer, 0, viewport_bytes);
 #ifdef DEBUG
-  std::cout << "xres           " << vinfo.xres << std::endl
+  std::cerr << "xres           " << vinfo.xres << std::endl
             << "yres           " << vinfo.yres << std::endl
             << "xres_virtual   " << vinfo.xres_virtual << std::endl
             << "yres_virtual   " << vinfo.yres_virtual << std::endl

@@ -23,7 +23,7 @@ int write(std::string path, std::string value) {
 void restore() {
   for (const auto &path : restore_list) {
     write(path + "/bind", "1");
-    std::cout << "[vtconsole::restore] " << path << std::endl;
+    std::cerr << "[vtconsole::restore] " << path << std::endl;
   }
 }
 
@@ -48,7 +48,7 @@ void unbind_all(bool restore_on_exit) {
       // Unbind and add to restore_list
       if (write(path + "/bind", "0") == 0) {
         restore_list.push_back(path);
-        std::cout << "[vtconsole::unbind] " << path << std::endl;
+        std::cerr << "[vtconsole::unbind] " << path << std::endl;
       } else {
         std::cerr << "[vtconsole::WARNING] Failed to unbind " << path
                   << std::endl;

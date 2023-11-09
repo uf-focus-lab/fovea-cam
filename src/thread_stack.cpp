@@ -27,7 +27,7 @@ void stack(Threading::FastIO<cv::Mat> &pipe_in,
       break;
     }
   }
-  std::cout << "[thread::stack] terminated." << std::endl;
+  std::cerr << "[thread::stack] terminated." << std::endl;
 }
 
 } // namespace thread

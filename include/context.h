@@ -3,6 +3,8 @@
 #include "fcmp/fcmp.h"
 
 #include <cstdint>
+#include <opencv2/opencv.hpp>
+#include <vector>
 
 namespace context {
 
@@ -19,9 +21,9 @@ public:
 
 typedef struct {
   // ArUco marker ID embedded in the image
-  unsigned id;
+  int id;
   // Center Position of the detected marker
-  double x, y;
+  std::vector<cv::Point2f> corners;
 } ArUcoInfo;
 
 } // namespace context

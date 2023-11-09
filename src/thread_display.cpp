@@ -31,7 +31,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     const unsigned w = canvas.shape().w, h = canvas.shape().h / (num_rows + 1);
     wide_view_tile =
         num_cols > 1 ? cv::Rect(0, 0, w, h) : cv::Rect(0, 0, w, h - pad);
-    std::cout << "[thread::display] " << num_cols << "x" << num_rows
+    std::cerr << "[thread::display] " << num_cols << "x" << num_rows
               << " fovea tiles." << std::endl;
     for (unsigned row = 0; row < num_rows; row++) {
       for (unsigned col = 0; col < num_cols; col++) {
@@ -90,7 +90,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
   pipe_tile_a.close();
   for (auto &pipe : pipe_tile_b)
     pipe->close();
-  std::cout << "[thread::display] terminated." << std::endl;
+  std::cerr << "[thread::display] terminated." << std::endl;
 }
 
 } // namespace thread

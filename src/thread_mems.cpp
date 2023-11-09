@@ -100,7 +100,7 @@ void mems(USB::SerialDevice &serial,
       // Send position until ACK
       bool flag_next = false;
       while (!flag_next && !flag_exit) {
-        std::cout << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+        std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
                   << ")" << std::endl;
         // Send frame
         SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
@@ -132,9 +132,9 @@ void mems(USB::SerialDevice &serial,
   pos_in.close();
   pos_out.close();
   // Wait for recv thread to terminate
-  std::cout << "[thread::mems] waiting for recv thread." << std::endl;
+  std::cerr << "[thread::mems] waiting for recv thread." << std::endl;
   recv.join();
-  std::cout << "[thread::mems] terminated." << std::endl;
+  std::cerr << "[thread::mems] terminated." << std::endl;
 }
 
 } // namespace thread
@@ -211,7 +211,7 @@ void recv_thread(USB::SerialDevice &device,
             current_sync = current_sync->conclude(next_pos_tag);
             mems::sync.write(current_sync);
             next_pos_tag = pos->tag;
-            // std::cout << LOG_NAME " ACK:POS " << Time::us() << std::endl;
+            // std::cerr << LOG_NAME " ACK:POS " << Time::us() << std::endl;
             { // Update acknowledge count
               std::lock_guard<std::mutex> lock(self.mutex);
               self.ack++;
@@ -258,5 +258,5 @@ void recv_thread(USB::SerialDevice &device,
   } catch (...) {
     std::cerr << LOG_NAME " Unknown exception" << std::endl;
   }
-  std::cout << LOG_NAME " terminated." << std::endl;
+  std::cerr << LOG_NAME " terminated." << std::endl;
 }

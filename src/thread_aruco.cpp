@@ -24,7 +24,7 @@ void generateArucoMarker() {
 unsigned counter = 0;
 
 void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FIFO<std::vector<context::ArUcoInfo>> &pipe_info_out) {
+           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out) {
   try {
     std::shared_ptr<const cv::Mat> prev_ptr = nullptr;
     while (!flag_exit) {
@@ -57,38 +57,19 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
           cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_100);
       cv::aruco::detectMarkers(mat, dictionary, corners, ids);
       // if at least one marker detected
-      if (ids.size() > 0) {
-        float x_center = 0, y_center = 0;
-        for (const auto &point : corners[0]) {
-          x_center += point.x;
-          y_center += point.y;
+      const double x_center = (double)mat.cols / 2,
+                   y_center = (double)mat.rows / 2;
+      for (const auto &id : ids) {
+        context::ArUcoInfo marker_info = {.id = id};
+        for (const auto &point : corners[id]) {
+          marker_info.corners.push_back(
+              cv::Point2f(point.x - x_center, point.y - y_center));
         }
-        x_center /= 4;
-        y_center /= 4;
-
-        // draw center
-        // cv::circle(mat, cv::Point2f(x_center, y_center), 4,
-        // cv::Scalar(0, 255, 0), -1);
-
-        // Making the coordinates relative to the center of the image
-        x_center -= (double)mat.cols / 2;
-        y_center -= (double)mat.rows / 2;
-
         // todo: update to handle more than one marker
-        info.push_back({0, -x_center, y_center});
-        // Do something with the center, e.g., draw a circle at the center
-        // cv::aruco::drawDetectedMarkers(mat, corners, ids);
-        // std::cout << LOGNAME " num markers: " << ids.size() << std::endl;
-        // std::cout << LOGNAME " num corners: " << corners[0].size() <<
-        // std::endl;
-        std::cout << LOGNAME " Detected <" << ids[0] << ">" << std::endl;
-        pipe_info_out.write(info);
-      } else {
-        std::cout << LOGNAME " No marker detected" << std::endl;
+        info.push_back(marker_info);
+        std::cerr << LOGNAME " Detected <" << ids[id] << ">" << std::endl;
       }
-      // Sort by id (ascending)
-      // Deduplicate (id should be unique)
-      // Send to output pipe
+      pipe_info_out.write(info);
     }
   } catch (Threading::END &e) {
   } catch (std::exception &e) {
@@ -96,7 +77,7 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
   }
   pipe_mat_in.close();
   pipe_info_out.close();
-  std::cout << LOGNAME " terminated." << std::endl;
+  std::cerr << LOGNAME " terminated." << std::endl;
 }
 
 } // namespace thread
