@@ -43,11 +43,9 @@ void track_pid(
       // Check if position is available
       if (current_pos == nullptr)
         continue;
-      if (info_wide == nullptr || info_fovea == nullptr)
+      if (info_fovea == nullptr)
         continue;
-      if (info_wide->size() == 0 || info_fovea->size() == 0) {
-        prev_info_fovea = info_fovea;
-        prev_info_wide = info_wide;
+      if (info_fovea->size() == 0) {
         continue;
       }
       // Get current mems position
@@ -68,8 +66,10 @@ void track_pid(
       // Send to mems
       mems_pos_next.write({mems_x, mems_y});
       // Check if the marker is the same
-      const int id = (*info_wide)[0].id;
-      if (id != (*info_fovea)[0].id)
+      const int id = (*info_fovea)[0].id;
+      if (info_wide == nullptr)
+        continue;
+      if (id != (*info_wide)[0].id)
         continue;
       if (prev_id == id)
         continue;
