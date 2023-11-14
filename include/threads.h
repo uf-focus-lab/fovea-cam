@@ -28,11 +28,13 @@ void mems(USB::SerialDevice &device,
           Threading::FastIO<context::MEMS_Position> &pos_out);
 
 void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out);
+           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out,
+           bool transform = false);
 
-void track_pid(Threading::FastIO<std::vector<context::ArUcoInfo>> &wide_info_in,
-               Threading::FastIO<std::vector<context::ArUcoInfo>> &fovea_info_in,
-               Threading::FIFO<context::MEMS_Position> &mems_pos_next,
-               Threading::FastIO<context::MEMS_Position> &mems_pos_back);
+void track_pid(
+    Threading::FastIO<std::vector<context::ArUcoInfo>> &wide_info_in,
+    Threading::FastIO<std::vector<context::ArUcoInfo>> &fovea_info_in,
+    Threading::FIFO<context::MEMS_Position> &mems_pos_next,
+    Threading::FastIO<context::MEMS_Position> &mems_pos_back);
 
 } // namespace thread

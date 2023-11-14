@@ -13,18 +13,11 @@ namespace thread {
 #undef LOGNAME
 #define LOGNAME "[thread::aruco]"
 
-void generateArucoMarker() {
-  cv::Mat markerImage;
-  cv::Ptr<cv::aruco::Dictionary> dictionary =
-      cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-  cv::aruco::drawMarker(dictionary, 23, 200, markerImage, 1);
-  cv::imwrite("./marker23.png", markerImage);
-}
-
 unsigned counter = 0;
 
 void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out) {
+           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out,
+           bool transform) {
   try {
     std::shared_ptr<const cv::Mat> prev_ptr = nullptr;
     while (!flag_exit) {
@@ -38,16 +31,19 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
       // Process new frame
       cv::Mat mat, global;
       cv::cvtColor(*next_ptr, mat, cv::COLOR_RGBA2GRAY);
-      // Resize to 1/2
-      cv::resize(mat, mat, cv::Size(), 0.5, 0.5);
-      // extend to float 32
-      mat.convertTo(mat, CV_32FC1);
-      cv::GaussianBlur(mat, mat, cv::Size(3, 3), 0, 0);
-      cv::GaussianBlur(mat, global, cv::Size(99, 99), 0, 0);
-      // Run threshold according to global light
-      cv::subtract(mat, global, mat);
-      cv::threshold(mat, mat, 0, 255, cv::THRESH_BINARY);
-      mat.convertTo(mat, CV_8UC1);
+      if (transform) {
+        // Resize to 1/2
+        cv::resize(mat, mat, cv::Size(), 0.5, 0.5);
+        // extend to float 32
+        mat.convertTo(mat, CV_32FC1);
+        cv::Mat global;
+        cv::GaussianBlur(mat, mat, cv::Size(3, 3), 0, 0);
+        cv::GaussianBlur(mat, global, cv::Size(99, 99), 0, 0);
+        // Run threshold according to global light
+        cv::subtract(mat, global, mat);
+        cv::threshold(mat, mat, 0, 255, cv::THRESH_BINARY);
+        mat.convertTo(mat, CV_8UC1);
+      }
       // The list of all detected markers
       std::vector<context::ArUcoInfo> info;
       // Do the detection
@@ -59,19 +55,28 @@ void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
       // if at least one marker detected
       const double x_center = (double)mat.cols / 2,
                    y_center = (double)mat.rows / 2;
-      for (const auto &id : ids) {
+      for (unsigned i = 0; i < ids.size(); i++) {
+        const int id = ids[i];
+        const auto c = corners[i];
         context::ArUcoInfo marker_info = {.id = id};
-        for (const auto &point : corners[id]) {
-          marker_info.corners.push_back(
-              cv::Point2f(point.x - x_center, point.y - y_center));
+        if (transform) {
+          for (const auto &point : c) {
+            marker_info.corners.push_back(cv::Point2f(
+                2 * (point.x - x_center), 2 * (point.y - y_center)));
+          }
+        } else {
+          for (const auto &point : c) {
+            marker_info.corners.push_back(
+                cv::Point2f(point.x - x_center, point.y - y_center));
+          }
         }
         // todo: update to handle more than one marker
         info.push_back(marker_info);
-        std::cerr << LOGNAME " Detected <" << ids[id] << ">" << std::endl;
       }
       pipe_info_out.write(info);
     }
   } catch (Threading::END &e) {
+    std::cerr << LOGNAME " PIPE END" << std::endl;
   } catch (std::exception &e) {
     std::cerr << LOGNAME "  " << e.what() << std::endl;
   }

@@ -13,7 +13,7 @@ debug: CMAKE_BUILD_TYPE := Debug
 release debug:
 	$(eval BUILD_DIR := build/$@/)
 	@ $(MAKE) $(BUILD_DIR)/Makefile CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
-	@ cd $(BUILD_DIR) && $(MAKE) -j$(nproc --all) && ln -sf ./FoveaCam ../
+	@ cd $(BUILD_DIR) && $(MAKE) && ln -sf ./FoveaCam ../
 	@ cd $(BUILD_DIR)/.. \
 		&& ln -sf $@/compile_commands.json . \
 		&& ln -sf $@/FoveaCam .

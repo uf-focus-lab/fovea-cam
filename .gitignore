@@ -9,3 +9,5 @@ debug
 __pycache__
 # Local documents should be added manually upon need
 docs
+# Runtime generated
+*.txt

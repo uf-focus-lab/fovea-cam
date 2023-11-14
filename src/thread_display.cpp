@@ -70,8 +70,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
           // Update pointer
           fovea_ptrs[i] = next_ptr;
         }
-        // canvas.apply();
-        cv::imshow("Display", canvas.Mat());
+        canvas.apply();
       }
     } catch (Threading::END &e) {
       // Normal termination
