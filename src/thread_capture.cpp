@@ -49,7 +49,7 @@ void configure(Spinnaker::CameraPtr &camera,
     // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
     map.set("ExposureTime", is_zoom_camera ? 200.0 * 1000.0 : 100 * 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 30.0 : 0.0);
+    map.set("Gain", is_zoom_camera ? 20.0 : 0.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -101,8 +101,11 @@ void capture(Spinnaker::CameraPtr &camera,
         for (auto &pipe : pipes_out)
           pipe->write(mat_ptr);
       } else if (tag <= pipes_out.size()) {
+        // BroadCast
+        auto mat_ptr = std::make_shared<const cv::Mat>(
+            Spinnaker::fromImagePtr(img_ptr, 1));
         // Specific
-        pipes_out[tag - 1]->write(Spinnaker::fromImagePtr(img_ptr));
+        pipes_out[tag - 1]->write(mat_ptr);
       } else {
         std::cerr << LOGNAME "Invalid position tag: " << tag << std::endl;
       }
