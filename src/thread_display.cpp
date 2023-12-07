@@ -48,16 +48,20 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
       }
     }
     try {
+      bool flag_new;
       while (1) {
+        flag_new = false;
         { // Wide angle
           auto next_ptr = pipe_tile_a.read();
           if (next_ptr == nullptr)
             continue; // No Data Available
           if (next_ptr == wide_ptr)
             continue; // Same Data
+          flag_new = true;
+          // Render to canvas
+          canvas.show(*next_ptr, wide_view_tile);
           // Update pointer and render to canvas
           wide_ptr = next_ptr;
-          canvas.show(*wide_ptr, wide_view_tile);
         }
         for (unsigned int i = 0; i < pipe_tile_b.size(); i++) { // Fovea streams
           auto next_ptr = pipe_tile_b[i]->read();
@@ -65,12 +69,14 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
             continue; // No Data Available
           if (next_ptr == fovea_ptrs[i])
             continue; // Same Data
+          flag_new = true;
           // Render to canvas
           canvas.show(*next_ptr, fovea_tiles[i]);
           // Update pointer
           fovea_ptrs[i] = next_ptr;
         }
-        canvas.apply();
+        if (flag_new)
+          canvas.apply();
       }
     } catch (Threading::END &e) {
       // Normal termination

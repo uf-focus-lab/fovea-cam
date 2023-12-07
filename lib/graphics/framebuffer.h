@@ -5,9 +5,9 @@
 namespace fb {
 
 typedef struct info {
-  uint32_t width, height;
+  uint32_t width, height, line_length;
   uint8_t bytes_per_pixel;
-  size_t viewport_pixels, viewport_bytes;
+  size_t buf_pixels, buf_bytes;
 } info;
 
 class FrameBuffer {
@@ -15,7 +15,7 @@ private:
   int fd;
   std::string path;
   // Map size will be 2 times buffer size, since we're using double buffer
-  size_t viewport_pixels, viewport_bytes;
+  size_t buf_pixels, buf_bytes;
   // Calculated at initialization
   uint8_t bytes_per_pixel;
   // framebuffer will also have 2 times the size of vscreen

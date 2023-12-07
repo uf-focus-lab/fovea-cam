@@ -73,7 +73,7 @@ size_t SerialDevice::read(uint8_t *data, size_t cap, size_t offset) {
     return cap;
   }
   const int ret = libusb_bulk_transfer(handle, endpoint.cdc_in, data + offset,
-                                       cap - offset, &actual_length, 0);
+                                       cap - offset, &actual_length, 1);
   switch (ret) {
   case LIBUSB_SUCCESS:
   case LIBUSB_ERROR_TIMEOUT:

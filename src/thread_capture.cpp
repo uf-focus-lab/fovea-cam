@@ -47,9 +47,9 @@ void configure(Spinnaker::CameraPtr &camera,
 
     map.set("ExposureAuto", "Off");
     // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
-    map.set("ExposureTime", is_zoom_camera ? 200.0 * 1000.0 : 100 * 1000.0);
+    map.set("ExposureTime", is_zoom_camera ? 20.0 * 1000.0 : 20 * 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 20.0 : 0.0);
+    map.set("Gain", is_zoom_camera ? 40.0 : 20.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8

@@ -2,8 +2,8 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
-#include <opencv2/core/types.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+#include <string>
 #include <type_traits>
 #include <unistd.h>
 
@@ -50,7 +50,7 @@ cv::Point transform_point(cv::Point p, shape s, const int &transform) {
 Canvas::Canvas(std::string path, int transform) : fb(path) {
   fb_info = fb.info();
   set_transform(transform);
-  mat = cv::Mat(shape().h, shape().w, CV_8UC4);
+  mat = cv::Mat(shape().h, fb_info.line_length, CV_8UC4);
 }
 
 int Canvas::get_transform() { return transform; };
@@ -148,12 +148,7 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   }
   dst = dst(trim);
   // Place the display image to buffer
-  if (dst.cols < static_cast<int>(info.width) &&
-      dst.rows < static_cast<int>(info.height)) {
-    dst.copyTo(mat(cv::Rect(pos, dst.size())));
-  } else {
-    dst.copyTo(mat);
-  }
+  dst.copyTo(mat(cv::Rect(pos, dst.size())));
   return *this;
 }
 

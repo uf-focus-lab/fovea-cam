@@ -81,6 +81,8 @@ void mems(USB::SerialDevice &serial,
           Threading::FastIO<context::MEMS_Position> &pos_out) {
   // FCMP Field Buffer
   static fcmp_field_cfg fcmp_config = {0};
+  // First reset the device
+  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
   // SET_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);

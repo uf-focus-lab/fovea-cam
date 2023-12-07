@@ -20,7 +20,7 @@
 // Create pipes
 Threading::FastIO<cv::Mat> wide_capture_pipe;
 std::vector<Threading::FastIO<cv::Mat> *> fovea_pipes;
-Threading::FIFO<context::MEMS_Position> pos_next;
+Threading::FIFO<context::MEMS_Position> pos_next(1);
 Threading::FastIO<context::MEMS_Position> pos_back;
 
 #define NO_THROW(STATEMENT)                                                    \
@@ -86,14 +86,14 @@ int main(int argc, char **argv) {
   if (task == "move") {
     // Multiplex 4 streams
     for (unsigned i = 0; i < 4; i++) {
-      fovea_pipes.push_back(new Threading::FastIO<cv::Mat>());
+      fovea_pipes.push_back(new Threading::FastIO<cv::Mat>);
     }
     // Send positions in new thread
     threads.push_back(std::thread([&]() {
       try {
         // Broadcast idle position
-        pos_next.write(context::MEMS_Position(0, 0));
-        pos_next.write(context::MEMS_Position(0, 0));
+        pos_next.write({0, 0});
+        pos_next.write({0, 0});
         std::this_thread::sleep_for(std::chrono::seconds(1));
         double step = 1.0, pos = 0.0;
         while (true) {
@@ -108,8 +108,8 @@ int main(int argc, char **argv) {
           pos_next.write({pos, -pos, 4});
         }
         // Broadcast idle position
-        pos_next.write(context::MEMS_Position(0, 0));
-        pos_next.write(context::MEMS_Position(0, 0));
+        pos_next.write({0, 0});
+        pos_next.write({0, 0});
         std::this_thread::sleep_for(std::chrono::seconds(1));
       } catch (Threading::END &) {
         // Normal termination
@@ -150,15 +150,15 @@ int main(int argc, char **argv) {
     threads.push_back(std::thread([&]() {
       try {
         // Broadcast idle position
-        pos_next.write(context::MEMS_Position(0, 0, 2));
+        pos_next.write({0, 0, 2});
         static const double r = 80.0;
         double theta = 0.0;
         while (true) {
-          theta += 0.05;
+          theta += 0.02;
           if (theta >= 2 * M_PI)
             theta -= 2 * M_PI;
           const double x = r * cos(theta), y = r * sin(theta);
-          pos_next.write(context::MEMS_Position(x, y, 2));
+          pos_next.write({x, y, 2});
         }
       } catch (Threading::END &) {
         // Normal termination
@@ -187,26 +187,34 @@ int main(int argc, char **argv) {
           static const double SCALE = 4.65;
           const auto V_x = pos->x, V_y = pos->y;
           const int W = wide->size().width, H = wide->size().height;
-          const double P_x = 4.8550527072855205 * V_x +
-                             -0.06391426216305784 * V_y + -63.05266182165999,
-                       P_y = -0.13296990693694496 * V_x +
-                             -3.428530040482606 * V_y + -64.27429261730323;
-          int x = (1.0 - 1.0 / SCALE) * (double)(W) / 2.0 + P_x,
-              y = (1.0 - 1.0 / SCALE) * (double)(H) / 2.0 + P_y,
+          const struct {
+            double x, y, xy, c;
+          } x_coeff = {4.85459339325059, -0.06452967035358549,
+                       0.00016280733222939038, -63.032525040658314},
+            y_coeff = {-0.13787596565316557, -3.435103383528066,
+                       0.0017389896032312644, -64.05920615697792};
+          const double P_x = x_coeff.x * V_x + x_coeff.y * V_y +
+                             x_coeff.xy * V_x * V_y + x_coeff.c,
+                       P_y = y_coeff.x * V_x + y_coeff.y * V_y +
+                             y_coeff.xy * V_x * V_y + y_coeff.c;
+          int x = (1.0 - 1.0 / x_coeff.x) * (double)(W) / 2.0 + P_x,
+              y = (1.0 + 1.0 / y_coeff.y) * (double)(H) / 2.0 + P_y,
               w = (double)(W) / SCALE, h = (double)(H) / SCALE;
-          if (x < 0) x = 0;
-          if (x + w > W) x = W - w;
-          if (y < 0) y = 0;
-          if (y + h > H) y = H - h;
-          cv::Rect roi =
-              cv::Rect(x, y, w, h);
+          if (x < 0)
+            x = 0;
+          if (x + w > W)
+            x = W - w;
+          if (y < 0)
+            y = 0;
+          if (y + h > H)
+            y = H - h;
+          cv::Rect roi = cv::Rect(x, y, w, h);
           // Push to pipe
           try {
             cv::Mat matched;
             cv::resize((*wide)(roi), matched, fovea->size());
-            fovea_pipes[0]->write(matched);
+            fovea_pipes[0]->write(std::move(matched));
           } catch (cv::Exception &e) {
-            // std::cerr << "[main] OpenCV Error: " << e.what() << std::endl;
             std::cerr << "[main] out of bound roi: " << roi << std::endl;
           }
         }

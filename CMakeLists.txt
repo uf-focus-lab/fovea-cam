@@ -10,9 +10,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_MODULE_PATH ${PROJECT_ROOT}/scripts)
 set(CMAKE_CXX_FLAGS "-Wall -Wno-ignored-qualifiers")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
-# set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-# Optimization Flags Specific to Jetson Nano
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -Ofast -march=armv8-a -mcpu=cortex-a57")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # Pkg Config
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libusb-1.0 REQUIRED libusb-1.0)
