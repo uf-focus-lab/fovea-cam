@@ -1,14 +1,19 @@
 ASSETS = $(wildcard *.png)
 ASSETS_H := $(patsubst %, %.h, $(ASSETS))
-ASSETS_C := $(patsubst %, %.cpp, $(ASSETS))
+ASSETS_C := $(patsubst %, %.c, $(ASSETS))
+ASSETS_O := $(patsubst %, %.o, $(ASSETS))
 
-all: $(ASSETS_H)
+all: $(ASSETS_O)
 
-%.h: %
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.c: %
 	python3 ../scripts/xxd.py $<
 
 clean:
 	@ echo "Cleaning assets"
-	rm -f $(ASSETS_H) $(ASSETS_C)
+	rm -f $(ASSETS_H) $(ASSETS_C) $(ASSETS_O)
 
 .PHONY: all clean
+.SUFFIXES:

@@ -12,6 +12,7 @@ debug: CMAKE_BUILD_TYPE := Debug
 
 release debug:
 	$(eval BUILD_DIR := build/$@/)
+	@ cd assets && $(MAKE) -j$(shell nproc --all)
 	@ $(MAKE) $(BUILD_DIR)/Makefile CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
 	@ cd $(BUILD_DIR) && $(MAKE) -j$(shell nproc --all) && ln -sf ./FoveaCam ../
 	@ cd $(BUILD_DIR)/.. \
@@ -24,7 +25,7 @@ build/%/Makefile: CMakeLists.txt
 	mkdir -p $(BUILD_DIR)
 	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) $(PWD)
 
-clean: clean_assets
+clean:
 	@ rm -rf build
 
 include $(wildcard scripts/*.mk)

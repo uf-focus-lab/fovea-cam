@@ -13,4 +13,5 @@ docs
 *.txt
 # assets
 assets/*.h
-assets/*.cpp
+assets/*.c
+assets/*.o

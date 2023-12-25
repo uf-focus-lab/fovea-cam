@@ -4,6 +4,8 @@
 #include "graphics/x11.h"
 #include "util/assert.h"
 
+#include "splash.png.h"
+
 namespace thread {
 
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
@@ -11,10 +13,11 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
   try {
     graphics::X11FB fb;
     graphics::Canvas canvas(fb.shape().w, fb.shape().h);
-    auto splash = cv::imread("assets/splash.png", cv::IMREAD_UNCHANGED);
+    const cv::Mat splash(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
+                   (char *)SPLASH_PNG_DATA);
     canvas.clear().show(splash).apply(fb.buffer());
     fb.sync();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     canvas.clear();
     ASSERT(pipe_tile_b.size() <= 4, "Too many streams");
     // Pointers to previously rendered frames

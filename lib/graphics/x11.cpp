@@ -58,7 +58,7 @@ public:
     const size_t bytes_per_line = width * 4;
     fb_bytes = height * bytes_per_line;
     fb = (unsigned char *)malloc(fb_bytes);
-    XImage *img = XCreateImage(display, vinfo.visual, vinfo.depth, ZPixmap, 0,
+    img = XCreateImage(display, vinfo.visual, vinfo.depth, ZPixmap, 0,
                                (char *)fb, width, height, 8, bytes_per_line);
     if (img == 0) {
       fprintf(stderr, "XImage is null!\n");

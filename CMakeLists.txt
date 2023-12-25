@@ -49,9 +49,17 @@ link_directories(
 # Project Local Library
 file(GLOB LIB_SRCS lib/*/*.cpp)
 # Get all the cpp files in the src directory
-file(GLOB sources src/*.cpp)
+file(GLOB SOURCES src/*.cpp)
+# Get all the generates assets
+file(GLOB ASSETS assets/*.o)
+SET_SOURCE_FILES_PROPERTIES(
+  ${ASSETS}
+  PROPERTIES
+  EXTERNAL_OBJECT true
+  GENERATED true
+)
 # Compile to binary
-add_executable(${PROJECT_NAME} ${sources} ${LIB_SRCS})
+add_executable(${PROJECT_NAME} ${ASSETS} ${LIB_SRCS} ${SOURCES})
 # Link with libraries
 target_link_libraries(${PROJECT_NAME}
   Threads::Threads
