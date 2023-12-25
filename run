@@ -1,0 +1,9 @@
+#!/bin/bash
+export DISPLAY=:0
+Xorg -noreset +extension GLX :10 &
+
+sleep 1
+
+sudo build/FoveaCam $@
+
+kill $(jobs -p)

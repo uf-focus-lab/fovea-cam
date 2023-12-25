@@ -7,8 +7,6 @@ MAKE := make --no-print-directory
 # CMake Build Directory and Build Type
 CMAKE_BUILD_TYPE ?= Unknown
 
-include $(wildcard scripts/*.mk)
-
 release: CMAKE_BUILD_TYPE := Release
 debug: CMAKE_BUILD_TYPE := Debug
 
@@ -26,7 +24,9 @@ build/%/Makefile: CMakeLists.txt
 	mkdir -p $(BUILD_DIR)
 	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) $(PWD)
 
-clean:
+clean: clean_assets
 	@ rm -rf build
+
+include $(wildcard scripts/*.mk)
 
 .PHONY: release debug clean
