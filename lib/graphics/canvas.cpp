@@ -1,13 +1,10 @@
 #include "canvas.h"
-#include <algorithm>
+
 #include <cstring>
-#include <iostream>
 #include <opencv2/opencv.hpp>
-#include <string>
-#include <type_traits>
 #include <unistd.h>
 
-namespace canvas {
+namespace graphics {
 
 cv::Mat transform_mat(const cv::Mat &src, const int &transform) {
   cv::Mat mat(src);
@@ -33,9 +30,7 @@ cv::Mat transform_mat(const cv::Mat &src, const int &transform) {
   return mat;
 }
 
-const auto _fork = fork;
-
-cv::Point transform_point(cv::Point p, shape s, const int &transform) {
+cv::Point transform_point(cv::Point p, Shape s, const int &transform) {
   if (transform & transform::TRANSPOSE) {
     p = {p.y, p.x};
     s = {s.h, s.w};
@@ -47,10 +42,15 @@ cv::Point transform_point(cv::Point p, shape s, const int &transform) {
   return p;
 }
 
-Canvas::Canvas(std::string path, int transform) : fb(path) {
-  fb_info = fb.info();
-  set_transform(transform);
-  mat = cv::Mat(shape().h, fb_info.line_length, CV_8UC4);
+Canvas::Canvas(unsigned width, unsigned height) : mat(height, width, CV_8UC4) {
+  this->width = width;
+  this->height = height;
+}
+
+Canvas::Canvas(unsigned width, unsigned height, unsigned line_length)
+    : mat(height, line_length, CV_8UC4) {
+  this->width = width;
+  this->height = height;
 }
 
 int Canvas::get_transform() { return transform; };
@@ -62,23 +62,13 @@ int Canvas::set_transform(int transform) {
   return transform;
 };
 
-int Canvas::fork() {
-  pid_t pid = _fork();
-  if (pid == 0) {
-    // Child process
-    fb.reopen();
-  }
-  return pid;
-}
-
 cv::Mat Canvas::Mat() { return mat; };
 
-canvas::shape Canvas::shape() {
-  const auto info = fb_info;
+Shape Canvas::shape() {
   if (transform & transform::TRANSPOSE) {
-    return {.w = info.height, .h = info.width};
+    return {.w = height, .h = width};
   } else {
-    return {.w = info.width, .h = info.height};
+    return {.w = width, .h = height};
   }
 }
 
@@ -128,7 +118,6 @@ Canvas &Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
 }
 
 Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
-  const auto info = fb.info();
   // Apply transform
   const auto tile_transform = transform ^ this->transform;
   auto dst = transform_mat(src, tile_transform);
@@ -140,11 +129,11 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   pos = corner_pos - corner_off;
   // Check if trim is necessary
   cv::Rect trim = {0, 0, dst.cols, dst.rows};
-  if (dst.cols + pos.x > static_cast<int>(info.width)) {
-    trim.width = info.width - pos.x;
+  if (dst.cols + pos.x > static_cast<int>(width)) {
+    trim.width = width - pos.x;
   }
-  if (dst.rows + pos.y > static_cast<int>(info.height)) {
-    trim.height = info.height - pos.y;
+  if (dst.rows + pos.y > static_cast<int>(height)) {
+    trim.height = height - pos.y;
   }
   dst = dst(trim);
   // Place the display image to buffer
@@ -152,9 +141,10 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   return *this;
 }
 
-Canvas &Canvas::apply() {
-  fb.from(mat.data);
+Canvas &Canvas::apply(void *fb) {
+  const auto s = mat.size();
+  memcpy(fb, mat.data, s.height * s.width * 4);
   return *this;
 }
 
-} // namespace canvas
+} // namespace graphics

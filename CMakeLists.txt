@@ -15,6 +15,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libusb-1.0 REQUIRED libusb-1.0)
 # Dependency Resolution
+find_package(X11 REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Spinnaker REQUIRED)
@@ -36,6 +37,7 @@ find_package(Spinnaker REQUIRED)
 include_directories(
   ${PROJECT_ROOT}/include/
   ${PROJECT_ROOT}/lib/
+  ${PROJECT_ROOT}/assets/
   ${Spinnaker_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -53,8 +55,9 @@ add_executable(${PROJECT_NAME} ${sources} ${LIB_SRCS})
 # Link with libraries
 target_link_libraries(${PROJECT_NAME}
   Threads::Threads
+  ${libusb-1.0_LIBRARIES}
+  # argparse
   ${OpenCV_LIBS}
   ${Spinnaker_LIBRARIES}
-  # argparse
-  ${libusb-1.0_LIBRARIES}
+  ${X11_LIBRARIES}
 )

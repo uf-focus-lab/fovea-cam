@@ -11,3 +11,6 @@ __pycache__
 docs
 # Runtime generated
 *.txt
+# assets
+assets/*.h
+assets/*.c

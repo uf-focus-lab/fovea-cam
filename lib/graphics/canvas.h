@@ -1,15 +1,16 @@
-#include "framebuffer.h"
 #include <opencv2/opencv.hpp>
 #include <stdint.h>
 #include <string>
 #include <sys/types.h>
 
-namespace canvas {
+#pragma once
+
+namespace graphics {
 
 typedef struct {
   unsigned int w;
   unsigned int h;
-} shape;
+} Shape;
 
 typedef enum {
   NONE = 0b000,
@@ -26,14 +27,14 @@ typedef enum {
 
 class Canvas {
 private:
-  fb::FrameBuffer fb;
-  fb::info fb_info;
   cv::Mat mat;
   int transform = transform::NONE;
   void constructor(std::string fb_path, int transform);
+  unsigned int width, height;
 
 public:
-  Canvas(std::string path, int transform = transform::NONE);
+  Canvas(unsigned, unsigned);
+  Canvas(unsigned, unsigned, unsigned);
   int get_transform();
   int set_transform(int);
   // Create a fork of framebuffer in new process
@@ -41,7 +42,7 @@ public:
   // Get the framebuffer
   cv::Mat Mat();
   // Shape of the canvas (after transformation)
-  canvas::shape shape();
+  Shape shape();
   // Set the color for entire buffer
   Canvas &clear();
   Canvas &clear(uint8_t);
@@ -56,7 +57,7 @@ public:
   Canvas &render(const cv::Mat &, cv::Point pos = {0, 0},
                  int transform = transform::NONE);
   // Apply internal buffer to framebuffer
-  Canvas &apply();
+  Canvas &apply(void *);
 };
 
-} // namespace canvas
+} // namespace graphics

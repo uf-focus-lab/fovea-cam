@@ -1,5 +1,4 @@
 #include "framebuffer.h"
-#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>

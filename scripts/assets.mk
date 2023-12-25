@@ -1,7 +1,10 @@
-ASSETS := $(patsubst assets/%, %, $(wildcard "assets/*"))
+ASSETS = $(filter-out $(wildcard assets/*.h) $(wildcard assets/*.c), $(wildcard assets/*))
+ASSETS_TARGETS := $(patsubst %, %.h, $(ASSETS))
 
-assets.dir:
-	mkdir -p build/.assets/
+all_assets: $(ASSETS_TARGETS)
 
-build/.assets/assets.h: assets.dir $(patsubst %, build/.assets/assets/%.c, $(ASSETS))
-	@ echo "Generating Assets"
+assets/%.h: assets/% scripts/xxd.py
+	@ echo "Generating asset $< -> $@"
+	@ python3 scripts/xxd.py $<
+
+.PHONY: assets

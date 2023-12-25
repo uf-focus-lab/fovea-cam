@@ -1,0 +1,8 @@
+#!/bin/bash
+export DISPLAY=:0
+# Start X
+Xorg $DISPLAY > /dev/null 2>&1 &
+# Start app
+build/FoveaCam $@
+# Kill X
+kill $(jobs -p)

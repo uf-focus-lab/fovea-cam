@@ -1,19 +1,19 @@
 #include "threads.h"
 
 #include "graphics/canvas.h"
+#include "graphics/x11.h"
 #include "util/assert.h"
-#include "util/vtconsole.h"
-#include <memory>
 
 namespace thread {
 
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
              std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b) {
   try {
-    vtconsole::unbind_all();
-    canvas::Canvas canvas("/dev/fb0", canvas::transform::NONE);
+    graphics::X11FB fb;
+    graphics::Canvas canvas(fb.shape().w, fb.shape().h);
     auto splash = cv::imread("assets/splash.png", cv::IMREAD_UNCHANGED);
-    canvas.clear().show(splash).apply();
+    canvas.clear().show(splash).apply(fb.buffer());
+    fb.sync();
     std::this_thread::sleep_for(std::chrono::seconds(1));
     canvas.clear();
     ASSERT(pipe_tile_b.size() <= 4, "Too many streams");
@@ -75,8 +75,10 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
           // Update pointer
           fovea_ptrs[i] = next_ptr;
         }
-        if (flag_new)
-          canvas.apply();
+        if (flag_new) {
+          canvas.apply(fb.buffer());
+          fb.sync();
+        }
       }
     } catch (Threading::END &e) {
       // Normal termination
@@ -89,7 +91,8 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
       std::cerr << "[thread::display] Unknown exception." << std::endl;
     };
     // Restore splash screen
-    canvas.clear().show(splash).apply();
+    canvas.clear().show(splash).apply(fb.buffer());
+    fb.sync();
   } catch (std::exception &e) {
     std::cerr << "[thread::display] " << e.what() << std::endl;
   }

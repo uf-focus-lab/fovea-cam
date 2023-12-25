@@ -1,11 +1,9 @@
 #include "context.h"
 #include "threads.h"
 
-#include "graphics/canvas.h"
 #include "threading/fast_io.h"
 #include "threading/fifo.h"
 #include "usb/serial_device.h"
-#include "util/spinnaker.h"
 #include "util/vtconsole.h"
 
 #include <chrono>
@@ -47,6 +45,8 @@ void close_all_pipes(int) {
 }
 
 int main(int argc, char **argv) {
+  thread::display(wide_capture_pipe, fovea_pipes);
+  return 0;
   const auto task = argc > 1 ? std::string(argv[1]) : std::string{"move"};
   // Get env pointers
   thread::env.FRAMERATE = std::getenv("FPS");
