@@ -133,8 +133,8 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
   pos_in.close();
   pos_out.close();
   // Wait for recv thread to terminate
-  std::cerr << "[thread::mems] waiting for recv thread." << std::endl;
-  recv.join();
+  // std::cerr << "[thread::mems] waiting for recv thread." << std::endl;
+  // recv.join();
   std::cerr << "[thread::mems] terminated." << std::endl;
 }
 

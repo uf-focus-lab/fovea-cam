@@ -1,12 +1,16 @@
 #include "x11.h"
 
+#include <X11/X.h>
 #include <cstring>
+#include <glob.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+
+#define LOG_NAME "[graphics::x11] "
 
 XVisualInfo *getVisualInfo(Display *display, int screen_number) {
   auto vinfo = new XVisualInfo;
@@ -29,6 +33,7 @@ private:
   unsigned char *fb = NULL;
   XImage *img = NULL;
   GC gc;
+  XEvent event;
   // indicates if the window is successfully opened
   bool open = false;
 
@@ -39,17 +44,16 @@ public:
     screen = XScreenOfDisplay(display, screen_number);
     window = XRootWindowOfScreen(screen);
     if (window == 0) {
-      fprintf(stderr, "Cannot get root window\n");
+      fprintf(stderr, LOG_NAME "Cannot get root window\n");
       return;
     } else {
-      printf("[X11FB] Got root window: %ld\n", window);
+      fprintf(stderr, LOG_NAME "Got root window: %ld\n", window);
     }
-    XSync(display, True);
     if (!XMatchVisualInfo(display, screen_number, 24, TrueColor, &vinfo)) {
       fprintf(stderr, "No matching visual configuration\n");
       return;
     } else {
-      printf("[X11FB] Got visual info: %d\n", vinfo.depth);
+      fprintf(stderr, LOG_NAME "Got visual info: %d\n", vinfo.depth);
     }
     XWindowAttributes window_attributes;
     XGetWindowAttributes(display, window, &window_attributes);
@@ -59,48 +63,134 @@ public:
     fb_bytes = height * bytes_per_line;
     fb = (unsigned char *)malloc(fb_bytes);
     img = XCreateImage(display, vinfo.visual, vinfo.depth, ZPixmap, 0,
-                               (char *)fb, width, height, 8, bytes_per_line);
+                       (char *)fb, width, height, 8, bytes_per_line);
     if (img == 0) {
-      fprintf(stderr, "XImage is null!\n");
+      fprintf(stderr, LOG_NAME "XImage is null!\n");
       return;
     } else {
-      printf("[X11FB] Display Size: %d x %d\n", img->width, img->height);
+      fprintf(stderr, LOG_NAME "Display Size: %d x %d\n", img->width,
+              img->height);
     }
-    XSync(display, True);
-    XSelectInput(display, window, ExposureMask | KeyPressMask);
+    XSelectInput(display, window,
+                 ExposureMask | KeyPressMask | ButtonPressMask |
+                     PointerMotionMask);
     XGCValues gcv = {.graphics_exposures = 0};
     gc = XCreateGC(display, window, GCGraphicsExposures, &gcv);
     XMapWindow(display, window);
     open = true;
   };
-  ~IMPL() {
-    // if (img != NULL)
-    //   XDestroyImage(img);
-    // if (fb != NULL)
-    //   free(fb);
-    // if (gc != NULL)
-    //   XFreeGC(display, gc);
-    // if (window != 0)
-    //   XDestroyWindow(display, window);
-    // if (display != NULL)
-    //   XCloseDisplay(display);
+
+  PointerEvent wait_pointer(bool block = true) {
+    while (block || events_pending()) {
+      XNextEvent(display, &event);
+      if (event.type == MotionNotify) {
+        // Get mouse position
+        return PointerEvent{true, event.xmotion.x, event.xmotion.y, 0};
+      } else if (event.type == ButtonPress) {
+        // Get mouse button
+        return PointerEvent{true, event.xmotion.x, event.xmotion.y,
+                            event.xbutton.button};
+      }
+    }
+    return PointerEvent{false, 0, 0, 0};
+  }
+
+  int events_pending() { return XPending(display); }
+
+  ~IMPL(){
+      // if (img != NULL)
+      //   XDestroyImage(img);
+      // if (fb != NULL)
+      //   free(fb);
+      // if (gc != NULL)
+      //   XFreeGC(display, gc);
+      // if (window != 0)
+      //   XDestroyWindow(display, window);
+      // if (display != NULL)
+      //   XCloseDisplay(display);
   };
   graphics::Shape shape() { return graphics::Shape{width, height}; };
   void use(void *buffer){/* TODO */};
   void sync() {
     XPutImage(display, window, gc, img, 0, 0, 0, 0, width, height);
-    XFlush(display);
   };
+  void flush() { XFlush(display); }
   bool isOpen() { return open; };
   unsigned char *buffer() { return (unsigned char *)fb; };
 };
 
 namespace graphics {
+
 X11FB::X11FB() : impl(new IMPL()){};
+
 X11FB::~X11FB() { delete (IMPL *)impl; }
+
 Shape X11FB::shape() { return ((IMPL *)impl)->shape(); }
+
 void X11FB::use(void *buffer) { ((IMPL *)impl)->use(buffer); }
+
 void X11FB::sync() { ((IMPL *)impl)->sync(); }
+
+void X11FB::flush() { ((IMPL *)impl)->flush(); }
+
 bool X11FB::isOpen() { return ((IMPL *)impl)->isOpen(); }
-unsigned char *X11FB::buffer() { return ((IMPL *)impl)->buffer(); };
+
+unsigned char *X11FB::buffer() { return ((IMPL *)impl)->buffer(); }
+
+PointerEvent X11FB::wait_pointer() { return ((IMPL *)impl)->wait_pointer(); }
+
+int X11FB::events_pending() { return ((IMPL *)impl)->events_pending(); }
+
+static const char *const argv_dmps[] = {"xset", "-dpms", NULL};
+static const char *const argv_soff[] = {"xset", "s", "off", NULL};
+static const char *const argv_nblk[] = {"xset", "s", "noblank", NULL};
+
+int xset() {
+  if (fork() == 0) {
+    execvp(argv_dmps[0], (char *const *)argv_dmps);
+    exit(0);
+  }
+  if (fork() == 0) {
+    execvp(argv_soff[0], (char *const *)argv_soff);
+    exit(0);
+  }
+  if (fork() == 0) {
+    execvp(argv_nblk[0], (char *const *)argv_nblk);
+    exit(0);
+  }
+  return 0;
+}
+
+int x11env() {
+  glob_t glob_result;
+  memset(&glob_result, 0, sizeof(glob_result));
+  const int ret = glob("/tmp/.X11-unix/X*", 0, nullptr, &glob_result);
+  if (ret) {
+    std::cerr << LOG_NAME "Error in glob() call" << std::endl;
+    globfree(&glob_result);
+    return 1;
+  }
+  for (size_t i = 0; i < glob_result.gl_pathc; ++i) {
+    std::string file_path = glob_result.gl_pathv[i];
+    if (access(file_path.c_str(), W_OK) == 0) {
+      // Extracting the DISPLAY number from the file path
+      size_t last_slash_pos = file_path.rfind('/');
+      if (last_slash_pos != std::string::npos) {
+        std::string display_number = file_path.substr(last_slash_pos + 2);
+        std::cerr << LOG_NAME "Using DISPLAY :" << display_number << std::endl;
+        setenv("DISPLAY", (":" + display_number).c_str(), 1);
+        globfree(&glob_result);
+        return xset();
+      } else {
+        std::cerr << LOG_NAME "Bad display path: " << file_path << std::endl;
+      }
+    } else {
+      std::cerr << LOG_NAME "Display not writable: "
+                << basename(file_path.c_str()) << std::endl;
+    }
+  }
+  globfree(&glob_result);
+  return 1;
+}
+
 } // namespace graphics

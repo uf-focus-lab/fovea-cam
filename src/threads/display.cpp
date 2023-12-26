@@ -1,9 +1,6 @@
 #include "threads.h"
 
-#include <cstring>
 #include <exception>
-#include <glob.h>
-#include <string>
 
 #include "graphics/canvas.h"
 #include "graphics/x11.h"
@@ -13,47 +10,11 @@
 
 #define LOG_NAME "[thread::display] "
 
-int x_env() {
-  glob_t glob_result;
-  memset(&glob_result, 0, sizeof(glob_result));
-  const int ret = glob("/tmp/.X11-unix/X*", 0, nullptr, &glob_result);
-  if (ret) {
-    std::cerr << LOG_NAME "Error in glob() call" << std::endl;
-    globfree(&glob_result);
-    return 1;
-  }
-  for (size_t i = 0; i < glob_result.gl_pathc; ++i) {
-    std::string file_path = glob_result.gl_pathv[i];
-    if (access(file_path.c_str(), W_OK) == 0) {
-      // Extracting the DISPLAY number from the file path
-      size_t last_slash_pos = file_path.rfind('/');
-      if (last_slash_pos != std::string::npos) {
-        std::string display_number = file_path.substr(last_slash_pos + 2);
-        std::cout << LOG_NAME "Using DISPLAY :" << display_number << std::endl;
-        setenv("DISPLAY", (":" + display_number).c_str(), 1);
-        globfree(&glob_result);
-        return 0;
-      } else {
-        std::cout << LOG_NAME "Bad display path: " << file_path << std::endl;
-      }
-    } else {
-      std::cout << LOG_NAME "Display not writable: "
-                << basename(file_path.c_str()) << std::endl;
-    }
-  }
-  globfree(&glob_result);
-  return 1;
-}
-
 namespace thread {
 
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
              std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b) {
   try {
-    if (x_env()) {
-      std::cerr << LOG_NAME "Failed to set DISPLAY environment." << std::endl;
-      return;
-    }
     graphics::X11FB fb;
     if (!fb.isOpen()) {
       std::cerr << LOG_NAME "Failed to open X11 framebuffer." << std::endl;

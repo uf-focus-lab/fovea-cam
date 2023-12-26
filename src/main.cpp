@@ -39,8 +39,12 @@ void close_all_pipes(int) {
   signal(SIGTERM, SIG_DFL);
 }
 
-int main(int argc, char **argv) {
-  const auto task = argc > 1 ? std::string(argv[1]) : std::string{"move"};
+int kiosk(const char *argv[]);
+
+int main(const int argc, const char **argv) {
+  if (argc < 2)
+    return kiosk(argv);
+  const auto task = std::string(argv[1]);
   // Get env pointers
   thread::env.FRAMERATE = std::getenv("FPS");
   thread::env.EXPOSURE = std::getenv("EXP");
