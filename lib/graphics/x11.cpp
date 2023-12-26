@@ -74,21 +74,22 @@ public:
     open = true;
   };
   ~IMPL() {
-    if (img != NULL)
-      XDestroyImage(img);
-    if (fb != NULL)
-      free(fb);
-    if (gc != NULL)
-      XFreeGC(display, gc);
-    if (window != 0)
-      XDestroyWindow(display, window);
-    if (display != NULL)
-      XCloseDisplay(display);
+    // if (img != NULL)
+    //   XDestroyImage(img);
+    // if (fb != NULL)
+    //   free(fb);
+    // if (gc != NULL)
+    //   XFreeGC(display, gc);
+    // if (window != 0)
+    //   XDestroyWindow(display, window);
+    // if (display != NULL)
+    //   XCloseDisplay(display);
   };
   graphics::Shape shape() { return graphics::Shape{width, height}; };
   void use(void *buffer){/* TODO */};
   void sync() {
     XPutImage(display, window, gc, img, 0, 0, 0, 0, width, height);
+    XFlush(display);
   };
   bool isOpen() { return open; };
   unsigned char *buffer() { return (unsigned char *)fb; };

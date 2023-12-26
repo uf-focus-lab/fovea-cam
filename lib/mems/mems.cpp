@@ -11,16 +11,18 @@ namespace mems {
 
 long delay = -5000; // us
 
-SyncWindow::SyncWindow(uint16_t tag) : _tag(tag) { window.open = Time::us(); }
+SyncWindow::SyncWindow(Position pos) : position(pos) {
+  window.open = Time::us();
+}
 
-std::shared_ptr<SyncWindow> SyncWindow::conclude(uint16_t tag) {
-  auto next = std::make_shared<SyncWindow>(SyncWindow(tag));
+std::shared_ptr<SyncWindow> SyncWindow::conclude(Position next) {
+  auto sync = std::make_shared<SyncWindow>(SyncWindow(next));
   window.close = Time::us();
   closed = true;
-  return next;
+  return sync;
 };
 
-uint16_t SyncWindow::tag() { return _tag; }
+uint16_t SyncWindow::tag() { return position.field.tag; }
 /*
  * Check if given time falls within this sync window.
  * Recommended: use exposure time in us as offset

@@ -1,23 +1,70 @@
 #include "threads.h"
 
+#include <cstring>
+#include <exception>
+#include <glob.h>
+#include <string>
+
 #include "graphics/canvas.h"
 #include "graphics/x11.h"
 #include "util/assert.h"
 
 #include "splash.png.h"
 
+#define LOG_NAME "[thread::display] "
+
+int x_env() {
+  glob_t glob_result;
+  memset(&glob_result, 0, sizeof(glob_result));
+  const int ret = glob("/tmp/.X11-unix/X*", 0, nullptr, &glob_result);
+  if (ret) {
+    std::cerr << LOG_NAME "Error in glob() call" << std::endl;
+    globfree(&glob_result);
+    return 1;
+  }
+  for (size_t i = 0; i < glob_result.gl_pathc; ++i) {
+    std::string file_path = glob_result.gl_pathv[i];
+    if (access(file_path.c_str(), W_OK) == 0) {
+      // Extracting the DISPLAY number from the file path
+      size_t last_slash_pos = file_path.rfind('/');
+      if (last_slash_pos != std::string::npos) {
+        std::string display_number = file_path.substr(last_slash_pos + 2);
+        std::cout << LOG_NAME "Using DISPLAY :" << display_number << std::endl;
+        setenv("DISPLAY", (":" + display_number).c_str(), 1);
+        globfree(&glob_result);
+        return 0;
+      } else {
+        std::cout << LOG_NAME "Bad display path: " << file_path << std::endl;
+      }
+    } else {
+      std::cout << LOG_NAME "Display not writable: "
+                << basename(file_path.c_str()) << std::endl;
+    }
+  }
+  globfree(&glob_result);
+  return 1;
+}
+
 namespace thread {
 
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
              std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b) {
   try {
+    if (x_env()) {
+      std::cerr << LOG_NAME "Failed to set DISPLAY environment." << std::endl;
+      return;
+    }
     graphics::X11FB fb;
+    if (!fb.isOpen()) {
+      std::cerr << LOG_NAME "Failed to open X11 framebuffer." << std::endl;
+      return;
+    }
     graphics::Canvas canvas(fb.shape().w, fb.shape().h);
     const cv::Mat splash(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
-                   (char *)SPLASH_PNG_DATA);
+                         (char *)SPLASH_PNG_DATA);
     canvas.clear().show(splash).apply(fb.buffer());
     fb.sync();
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     canvas.clear();
     ASSERT(pipe_tile_b.size() <= 4, "Too many streams");
     // Pointers to previously rendered frames
@@ -34,8 +81,8 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     const unsigned w = canvas.shape().w, h = canvas.shape().h / (num_rows + 1);
     wide_view_tile =
         num_cols > 1 ? cv::Rect(0, 0, w, h) : cv::Rect(0, 0, w, h - pad);
-    std::cerr << "[thread::display] " << num_cols << "x" << num_rows
-              << " fovea tiles." << std::endl;
+    std::cerr << LOG_NAME "" << num_cols << "x" << num_rows << " fovea tiles."
+              << std::endl;
     for (unsigned row = 0; row < num_rows; row++) {
       for (unsigned col = 0; col < num_cols; col++) {
         fovea_ptrs.push_back(nullptr);
@@ -88,21 +135,21 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     }
     CATCH_ASSERT(;)
     catch (std::exception &e) {
-      std::cerr << "[thread::display] " << e.what() << std::endl;
+      std::cerr << LOG_NAME "" << e.what() << std::endl;
     }
     catch (...) {
-      std::cerr << "[thread::display] Unknown exception." << std::endl;
+      std::cerr << LOG_NAME "Unknown exception." << std::endl;
     };
     // Restore splash screen
     canvas.clear().show(splash).apply(fb.buffer());
     fb.sync();
   } catch (std::exception &e) {
-    std::cerr << "[thread::display] " << e.what() << std::endl;
+    std::cerr << LOG_NAME "" << e.what() << std::endl;
   }
   pipe_tile_a.close();
   for (auto &pipe : pipe_tile_b)
     pipe->close();
-  std::cerr << "[thread::display] terminated." << std::endl;
+  std::cerr << LOG_NAME "terminated." << std::endl;
 }
 
 } // namespace thread

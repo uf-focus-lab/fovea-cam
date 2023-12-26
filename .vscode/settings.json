@@ -8,6 +8,7 @@
         "altsetting",
         "argparse",
         "aruco",
+        "calib",
         "fcmp",
         "libusb"
     ],

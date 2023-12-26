@@ -47,9 +47,9 @@ link_directories(
   ${OpenCV_LIB_DIRS}
 )
 # Project Local Library
-file(GLOB LIB_SRCS lib/*/*.cpp)
+file(GLOB LIB_SRCS ${PROJECT_ROOT}/lib/*/*.cpp)
 # Get all the cpp files in the src directory
-file(GLOB SOURCES src/*.cpp)
+file(GLOB SOURCES ${PROJECT_ROOT}/src/*.cpp ${PROJECT_ROOT}/src/*/*.cpp)
 # Get all the generates assets
 file(GLOB ASSETS assets/*.o)
 SET_SOURCE_FILES_PROPERTIES(

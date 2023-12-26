@@ -6,7 +6,6 @@
 
 #include "threads.h"
 
-#include <cstdlib>
 #include <mutex>
 
 #undef LOGNAME
@@ -45,11 +44,11 @@ void configure(Spinnaker::CameraPtr &camera,
       map.set("AcquisitionFrameRateEnable", false);
     }
 
-    map.set("ExposureAuto", "Off");
-    // map.set("ExposureTime", is_zoom_camera ? 100.0 * 1000.0 : 1000.0);
-    map.set("ExposureTime", is_zoom_camera ? 20.0 * 1000.0 : 20 * 1000.0);
+    double exp = thread::env.EXPOSURE ? std::stod(thread::env.EXPOSURE) * 1000.0
+                                      : 1000.0;
+    map.set("ExposureTime", is_zoom_camera ? exp * 30.0 : exp * 1.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? 40.0 : 20.0);
+    map.set("Gain", 0.0);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -71,7 +70,8 @@ void configure(Spinnaker::CameraPtr &camera,
 namespace thread {
 // Zoom camera
 void capture(Spinnaker::CameraPtr &camera,
-             std::vector<Threading::FastIO<cv::Mat> *> pipes_out) {
+             std::vector<Threading::FastIO<cv::Mat> *> pipes_out,
+             Threading::FastIO<mems::Position> &pos_real) {
   try {
     configure(camera, true);
   } catch (std::exception &e) {
@@ -91,6 +91,7 @@ void capture(Spinnaker::CameraPtr &camera,
       while (sync_window->test(now) > 0) {
         sync_window = mems::sync.read();
       }
+      pos_real.write(sync_window->position);
       // Use the sync window to determine the position tag
       const auto tag = sync_window->tag();
       // std::cerr << LOGNAME " Got tag (" << tag << ")" << std::endl;
@@ -112,17 +113,23 @@ void capture(Spinnaker::CameraPtr &camera,
     }
   } catch (Threading::END &e) {
     // Normal termination
+    for (auto &pipe : pipes_out) {
+      pipe->close();
+    }
+    pos_real.close();
   } catch (Spinnaker::Exception &e) {
     std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
     for (auto &pipe : pipes_out) {
       pipe->close();
     }
+    pos_real.close();
   }
   CATCH_ASSERT(;) catch (...) {
     std::cerr << LOGNAME "Unknown Error" << std::endl;
     for (auto &pipe : pipes_out) {
       pipe->close();
     }
+    pos_real.close();
   };
   // Release camera instance
   try {

@@ -26,8 +26,8 @@ namespace thread {
 void track_pid(
     Threading::FastIO<std::vector<context::ArUcoInfo>> &wide_info_in,
     Threading::FastIO<std::vector<context::ArUcoInfo>> &fovea_info_in,
-    Threading::FIFO<context::MEMS_Position> &mems_pos_next,
-    Threading::FastIO<context::MEMS_Position> &mems_pos_back) {
+    Threading::FIFO<mems::Position> &mems_pos_next,
+    Threading::FastIO<mems::Position> &mems_pos_back) {
   try {
     mems_pos_next.write({0.0, 0.0});
     mems_pos_next.write({0.0, 0.0});

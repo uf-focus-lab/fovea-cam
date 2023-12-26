@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fcmp/fcmp.h"
 #include "threading/fifo.h"
 #include "util/time.h"
 
@@ -7,6 +8,17 @@
 #include <mutex>
 
 namespace mems {
+
+class Position {
+public:
+  // Value range: [-v_bias, +v_bias]
+  // Out-ranged values will be clipped to nearest boundary.
+  double x, y;
+  fcmp_field_pos field;
+  Position(double x, double y, uint8_t tag = 0) : x(x), y(y) {
+    field.tag = tag;
+  }
+};
 
 extern long delay;
 
@@ -17,12 +29,12 @@ private:
     unsigned long open, close;
   } window;
   bool closed = false;
-  uint16_t _tag;
 
 public:
-  SyncWindow(uint16_t tag);
+  Position position;
+  SyncWindow(Position pos = Position(0, 0, 0));
   // Called by mems recv upon arrival of next sync window.
-  std::shared_ptr<SyncWindow> conclude(uint16_t tag);
+  std::shared_ptr<SyncWindow> conclude(Position next);
   // Getter of the tag for this window
   uint16_t tag();
   /*

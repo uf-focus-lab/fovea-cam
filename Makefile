@@ -14,10 +14,9 @@ release debug:
 	$(eval BUILD_DIR := build/$@/)
 	@ cd assets && $(MAKE) -j$(shell nproc --all)
 	@ $(MAKE) $(BUILD_DIR)/Makefile CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+	@ cd $(BUILD_DIR)/.. && ln -sf $@/compile_commands.json .
 	@ cd $(BUILD_DIR) && $(MAKE) -j$(shell nproc --all) && ln -sf ./FoveaCam ../
-	@ cd $(BUILD_DIR)/.. \
-		&& ln -sf $@/compile_commands.json . \
-		&& ln -sf $@/FoveaCam .
+	@ cd $(BUILD_DIR)/.. && ln -sf $@/FoveaCam .
 
 build/%/Makefile: CMakeLists.txt
 	$(eval BUILD_DIR := $(shell dirname $@))
@@ -28,6 +27,14 @@ build/%/Makefile: CMakeLists.txt
 clean:
 	@ rm -rf build
 
+init:
+	sudo ln -sf $(PWD)/scripts/Xorg.service /etc/systemd/system/Xorg.service
+	sudo systemctl stop gdm.service
+	sudo systemctl disable gdm.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable Xorg.service
+	sudo systemctl restart Xorg.service
+
 include $(wildcard scripts/*.mk)
 
-.PHONY: release debug clean
+.PHONY: release debug init clean

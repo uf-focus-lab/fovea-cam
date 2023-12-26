@@ -1,5 +1,5 @@
-#include "context.h"
 #include "mems/mems.h"
+#include "context.h"
 #include "threads.h"
 
 #include "cobs/cobs.h"
@@ -69,16 +69,15 @@ static inline void compute_channels(const double &pos, uint16_t &ch1,
 }
 
 void recv_thread(USB::SerialDevice &device,
-                 Threading::FastIO<context::MEMS_Position> &pos_out);
+                 Threading::FastIO<mems::Position> &pos_out);
 
 namespace thread {
 
 #undef LOG_NAME
 #define LOG_NAME "[thread::mems]"
 
-void mems(USB::SerialDevice &serial,
-          Threading::FIFO<context::MEMS_Position> &pos_in,
-          Threading::FastIO<context::MEMS_Position> &pos_out) {
+void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
+          Threading::FastIO<mems::Position> &pos_out) {
   // FCMP Field Buffer
   static fcmp_field_cfg fcmp_config = {0};
   // First reset the device
@@ -163,13 +162,14 @@ void serial_flush(USB::SerialDevice &device) {
     serial_read(device);
   }
 }
+
 void recv_thread(USB::SerialDevice &device,
-                 Threading::FastIO<context::MEMS_Position> &pos_out) {
+                 Threading::FastIO<mems::Position> &pos_out) {
   try {
     std::shared_ptr<mems::SyncWindow> current_sync =
-        std::make_shared<mems::SyncWindow>(0);
+        std::make_shared<mems::SyncWindow>();
     mems::sync.write(current_sync);
-    uint16_t next_pos_tag = 0;
+    mems::Position next_pos(0, 0, 0);
     while (!thread::flag_exit) {
       serial_read(device);
       // Decode COBS
@@ -200,8 +200,6 @@ void recv_thread(USB::SerialDevice &device,
                       field = frame->header & FCMP_FIELD;
         if (field == FCMP_FIELD_POS) {
           if (method == FCMP_METHOD_ACK) {
-            // Handle ACK:POS
-            const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
             // Check payload size
             if (payload_size != sizeof(fcmp_field_pos)) {
               std::cerr << LOG_NAME " FCMP Position Payload Size Mismatch (Got "
@@ -210,19 +208,19 @@ void recv_thread(USB::SerialDevice &device,
               continue;
             }
             // Update synchronization window
-            current_sync = current_sync->conclude(next_pos_tag);
+            current_sync = current_sync->conclude(next_pos);
+            // Handle ACK:POS
+            const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
+            next_pos = mems::Position(
+                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
+                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]));
             mems::sync.write(current_sync);
-            next_pos_tag = pos->tag;
             // std::cerr << LOG_NAME " ACK:POS " << Time::us() << std::endl;
             { // Update acknowledge count
               std::lock_guard<std::mutex> lock(self.mutex);
               self.ack++;
               self.updated.notify_all();
             }
-            // Push position to output pipe
-            pos_out.write(context::MEMS_Position(
-                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
-                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3])));
           } else if (method == FCMP_METHOD_REJ) {
             { // Update rejection count
               std::lock_guard<std::mutex> lock(self.mutex);
