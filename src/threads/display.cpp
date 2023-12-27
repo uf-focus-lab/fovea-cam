@@ -1,3 +1,4 @@
+#include "global.h"
 #include "threads.h"
 
 #include <exception>
@@ -25,6 +26,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
       std::cerr << LOG_NAME "Failed to open X11 framebuffer." << std::endl;
       return;
     }
+
     graphics::Canvas canvas(fb.shape().w, fb.shape().h);
     const cv::Mat splash(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
                          (char *)SPLASH_PNG_DATA);
@@ -64,8 +66,10 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
       }
     }
     try {
+      PointerEvent ptr;
       bool flag_new;
-      while (1) {
+      do {
+        ptr = fb.wait_pointer(false);
         flag_new = false;
         { // Wide angle
           auto next_ptr = pipe_tile_a.read();
@@ -95,7 +99,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
           canvas.apply(fb.buffer());
           fb.sync();
         }
-      }
+      } while (!(ptr.valid && ptr.button));
     } catch (Threading::END &e) {
       // Normal termination
     }
@@ -112,9 +116,7 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
   } catch (std::exception &e) {
     std::cerr << LOG_NAME "" << e.what() << std::endl;
   }
-  pipe_tile_a.close();
-  for (auto &pipe : pipe_tile_b)
-    pipe->close();
+  global::close_all_pipes();
   std::cerr << LOG_NAME "terminated." << std::endl;
 }
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=FoveaCam
+After=Xorg.service
+StartLimitIntervalSec=5
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+ExecStart=/home/yuxuan/fovea-cam/scripts/kiosk.sh
+
+[Install]
+WantedBy=graphical.target

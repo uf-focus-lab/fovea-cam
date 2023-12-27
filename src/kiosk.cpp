@@ -94,9 +94,12 @@ extern char **environ;
 int run(graphics::X11FB &fb, const char *_argv[], double exp, double fps,
         std::string cmd) {
   std::vector<const char *> argv;
-  std::cout << "EXP=" << exp << " "
-            << "FPS=" << fps << " " << _argv[0] << " " << cmd;
-
+  if (exp < 0.01)
+    exp = 0.01;
+  std::cout << "EXP=" << exp * 10 << " ";
+  if (fps > 0.1)
+    std::cout << "FPS=" << std::to_string((int)rint(fps * 110 - 10.5)) << " ";
+  std::cout << _argv[0] << " " << cmd;
   return 0;
 }
 

@@ -22,9 +22,10 @@ std::vector<Threading::FastIO<cv::Mat> *> global::fovea_pipes;
 Threading::FIFO<mems::Position> global::pos_next(1);
 Threading::FastIO<mems::Position> global::pos_back;
 Threading::FastIO<mems::Position> global::pos_real;
+std::vector<std::thread> global::threads;
 using namespace global;
 
-void close_all_pipes(int) {
+void global::close_all_pipes(int) {
   std::cerr << std::endl;
   thread::flag_exit = true;
   NO_THROW(wide_capture_pipe.close());
@@ -33,6 +34,7 @@ void close_all_pipes(int) {
   }
   NO_THROW(pos_next.close());
   NO_THROW(pos_back.close());
+  NO_THROW(pos_real.close());
   // Restore all signals to default
   signal(SIGINT, SIG_DFL);
   signal(SIGKILL, SIG_DFL);
@@ -78,8 +80,6 @@ int main(const int argc, const char **argv) {
     spinnaker->ReleaseInstance();
     return -1;
   }
-  // Begin acquisition
-  std::vector<std::thread> threads;
   // Task specific threads
   if (task == "move") {
     tasks::move(threads);
@@ -105,10 +105,13 @@ int main(const int argc, const char **argv) {
   threads.push_back(
       std::thread([&]() { thread::mems(mems, pos_next, pos_back); }));
   // Wait for threads to terminate
+  size_t n_threads = threads.size();
   for (auto &thread : threads) {
     thread.join();
+    std::cerr << "[main] " << --n_threads << " threads remaining." << std::endl;
   }
   // Release resources
+  std::cerr << "[main] releasing spinnaker resources." << std::endl;
   NO_THROW(camList.Clear());
   NO_THROW(spinnaker->ReleaseInstance());
   std::cerr << "[main] terminated." << std::endl;

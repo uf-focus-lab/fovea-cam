@@ -21,4 +21,6 @@ extern std::vector<Threading::FastIO<cv::Mat> *> fovea_pipes;
 extern Threading::FIFO<mems::Position> pos_next;
 extern Threading::FastIO<mems::Position> pos_back;
 extern Threading::FastIO<mems::Position> pos_real;
+extern std::vector<std::thread> threads;
+void close_all_pipes(int = 0);
 } // namespace global

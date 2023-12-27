@@ -1,2 +1,2 @@
 #!/bin/sh
-sudo pkexec --user root /usr/bin/gdb "$@"
+sudo pkexec --user root /usr/bin/gdb "$@" -ex 'quit'

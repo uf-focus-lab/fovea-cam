@@ -1,5 +1,4 @@
 #include "mems/mems.h"
-#include "context.h"
 #include "threads.h"
 
 #include "cobs/cobs.h"
@@ -7,9 +6,7 @@
 #include "threading/exception.h"
 #include "threading/fast_io.h"
 #include "threading/fifo.h"
-#include "util/time.h"
 
-#include <cerrno>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
@@ -101,8 +98,8 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
       // Send position until ACK
       bool flag_next = false;
       while (!flag_next && !flag_exit) {
-        std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
-                  << ")" << std::endl;
+        // std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+        //           << ")" << std::endl;
         // Send frame
         SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
         // Check for ACK
@@ -118,9 +115,9 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
   } catch (Threading::END &) {
     // Normal termination
   } catch (std::runtime_error &e) {
-    std::cerr << "[thread::mems] " << e.what() << std::endl;
+    std::cerr << LOG_NAME " " << e.what() << std::endl;
   } catch (...) {
-    std::cerr << "[thread::mems] Unknown exception" << std::endl;
+    std::cerr << LOG_NAME " Unknown exception" << std::endl;
   }
   // Make sure COBS is flushed
   serial.write((uint8_t *)"\0\0\0\0", 4);
@@ -133,9 +130,9 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
   pos_in.close();
   pos_out.close();
   // Wait for recv thread to terminate
-  // std::cerr << "[thread::mems] waiting for recv thread." << std::endl;
-  // recv.join();
-  std::cerr << "[thread::mems] terminated." << std::endl;
+  std::cerr << LOG_NAME " waiting for recv thread." << std::endl;
+  recv.join();
+  std::cerr << LOG_NAME " terminated." << std::endl;
 }
 
 } // namespace thread
@@ -175,6 +172,8 @@ void recv_thread(USB::SerialDevice &device,
       // Decode COBS
       int ret;
       while ((ret = cobs_decode(&cobs_rx, serial_rx.buf, serial_rx.size)) > 0) {
+        if (thread::flag_exit)
+          break;
         // Save the remaining bytes
         move_ahead(serial_rx.buf, &serial_rx.size, ret);
         // Save payload size and reset cobs_rx
@@ -230,6 +229,7 @@ void recv_thread(USB::SerialDevice &device,
             std::string message((const char *)frame->field, payload_size);
             std::cerr << LOG_NAME " FCMP Position Request Rejected (" << message
                       << ")" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
             // fcmp_log_frame(method, field, frame->field, payload_size);
           }

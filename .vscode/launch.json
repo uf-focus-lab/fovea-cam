@@ -9,10 +9,10 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/FoveaCam",
-            "miDebuggerPath": "${workspaceFolder}/scripts/sudo_gdb.sh",
+            "miDebuggerPath": "${workspaceFolder}/scripts/sudo_gdb",
             "preLaunchTask": "Build:debug",
             "args": [
-                // "/dev/fb0",
+                "match",
             ],
             "environment": [
                 {
