@@ -15,6 +15,11 @@ namespace thread {
 void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
              std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b) {
   try {
+    if (graphics::x11env()) {
+      std::cerr << LOG_NAME "Failed to locate X11 server." << std::endl;
+      return;
+    }
+
     graphics::X11FB fb;
     if (!fb.isOpen()) {
       std::cerr << LOG_NAME "Failed to open X11 framebuffer." << std::endl;
@@ -23,9 +28,9 @@ void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
     graphics::Canvas canvas(fb.shape().w, fb.shape().h);
     const cv::Mat splash(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
                          (char *)SPLASH_PNG_DATA);
-    canvas.clear().show(splash).apply(fb.buffer());
-    fb.sync();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // canvas.clear().show(splash).apply(fb.buffer());
+    // fb.sync();
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
     canvas.clear();
     ASSERT(pipe_tile_b.size() <= 4, "Too many streams");
     // Pointers to previously rendered frames

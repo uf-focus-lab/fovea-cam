@@ -1,10 +1,10 @@
 #include <cmath>
-#include <cstring>
 #include <glob.h>
 #include <iostream>
 #include <opencv2/core/types.hpp>
 #include <string>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 #include "graphics/canvas.h"
@@ -94,36 +94,9 @@ extern char **environ;
 int run(graphics::X11FB &fb, const char *_argv[], double exp, double fps,
         std::string cmd) {
   std::vector<const char *> argv;
-  argv.push_back(_argv[0]);
-  argv.push_back(cmd.c_str());
-  const auto EXP = std::to_string(exp < 0.01 ? 0.01 : exp);
-  setenv("EXP", EXP.c_str(), 1);
-  if (fps > 0.1)
-    setenv("FPS", std::to_string((int)rint(fps * 110 - 10.5)).c_str(), 1);
-  // Fork and exec
-  int pid;
-  if ((pid = fork()) == 0) {
-    std::cerr << LOG_NAME "Forked child process " << argv[0] << ' ' << argv[1]
-              << std::endl;
-    execvp(argv[0], (char *const *)argv.data());
-    std::cerr << LOG_NAME "Failed to exec child process" << std::endl;
-    exit(1);
-  }
-  fb.flush();
-  std::cerr << LOG_NAME "Waiting for child" << std::endl;
-  // Wait for child process to terminate
-  while (1) {
-    // Check if child process is still running
-    if (waitpid(pid, NULL, WNOHANG) == pid)
-      break;
-    // Check for input event
-    PointerEvent pos;
-    while ((pos = fb.wait_pointer()).valid) {
-      if (pos.button) {
-        kill(pid, SIGINT);
-      }
-    }
-  }
+  std::cout << "EXP=" << exp << " "
+            << "FPS=" << fps << " " << _argv[0] << " " << cmd;
+
   return 0;
 }
 
@@ -179,9 +152,9 @@ int kiosk(const char *argv[]) {
       .show(btn_match.mat, btn_match.bbox)
       .show(btn_rec.mat, btn_rec.bbox)
       .apply(fb.buffer());
-  fb.sync();
   // Enter event loop
   while (1) {
+    fb.sync();
     PointerEvent pos = fb.wait_pointer();
     // Check for corresponding tile
     if (exp.handle(pos)) {
@@ -202,33 +175,37 @@ int kiosk(const char *argv[]) {
       btn_move.fill(bg).fill(stroke).text("MOV", fg);
       canvas.show(btn_move.mat, btn_move.bbox).apply(fb.buffer());
       fb.sync();
-      run(fb, argv, exp.value, fps.value, "move");
-      canvas.apply(fb.buffer());
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      canvas.show(splash).apply(fb.buffer());
       fb.sync();
+      return run(fb, argv, exp.value, fps.value, "move");
     }
     if (btn_track.handle(pos)) {
       btn_track.fill(bg).fill(stroke).text("TRK", fg);
       canvas.show(btn_track.mat, btn_track.bbox).apply(fb.buffer());
       fb.sync();
-      run(fb, argv, exp.value, fps.value, "track");
-      canvas.apply(fb.buffer());
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      canvas.show(splash).apply(fb.buffer());
       fb.sync();
+      return run(fb, argv, exp.value, fps.value, "track");
     }
     if (btn_match.handle(pos)) {
       btn_match.fill(bg).fill(stroke).text("MCH", fg);
       canvas.show(btn_match.mat, btn_match.bbox).apply(fb.buffer());
       fb.sync();
-      run(fb, argv, exp.value, fps.value, "match");
-      canvas.apply(fb.buffer());
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      canvas.show(splash).apply(fb.buffer());
       fb.sync();
+      return run(fb, argv, exp.value, fps.value, "match");
     }
     if (btn_rec.handle(pos)) {
       btn_rec.fill(bg).fill(stroke).text("CAP", fg);
       canvas.show(btn_rec.mat, btn_rec.bbox).apply(fb.buffer());
       fb.sync();
-      run(fb, argv, exp.value, fps.value, "capture");
-      canvas.apply(fb.buffer());
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      canvas.show(splash).apply(fb.buffer());
       fb.sync();
+      return run(fb, argv, exp.value, fps.value, "capture");
     }
   }
   return 0;

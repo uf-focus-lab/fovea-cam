@@ -80,7 +80,7 @@ public:
     open = true;
   };
 
-  PointerEvent wait_pointer(bool block = true) {
+  PointerEvent wait_pointer(bool block) {
     while (block || events_pending()) {
       XNextEvent(display, &event);
       if (event.type == MotionNotify) {
@@ -137,7 +137,9 @@ bool X11FB::isOpen() { return ((IMPL *)impl)->isOpen(); }
 
 unsigned char *X11FB::buffer() { return ((IMPL *)impl)->buffer(); }
 
-PointerEvent X11FB::wait_pointer() { return ((IMPL *)impl)->wait_pointer(); }
+PointerEvent X11FB::wait_pointer(bool block) {
+  return ((IMPL *)impl)->wait_pointer(block);
+}
 
 int X11FB::events_pending() { return ((IMPL *)impl)->events_pending(); }
 

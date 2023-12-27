@@ -26,7 +26,7 @@ public:
   void flush();
   void use(void *buffer);
   bool isOpen();
-  PointerEvent wait_pointer();
+  PointerEvent wait_pointer(bool block = true);
   int events_pending();
 };
 

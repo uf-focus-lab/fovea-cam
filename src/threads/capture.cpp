@@ -46,6 +46,10 @@ void configure(Spinnaker::CameraPtr &camera,
 
     double exp = thread::env.EXPOSURE ? std::stod(thread::env.EXPOSURE) * 1000.0
                                       : 1000.0;
+    if (thread::env.EXPOSURE)
+      std::cerr << "[thread::capture] Setting exposure to " << exp / 1000.0
+                << " ms" << std::endl;
+    map.set("ExposureAuto", "Off");
     map.set("ExposureTime", is_zoom_camera ? exp * 30.0 : exp * 1.0);
     map.set("GainAuto", "Off");
     map.set("Gain", 0.0);
