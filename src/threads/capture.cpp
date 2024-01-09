@@ -32,8 +32,8 @@ void configure(Spinnaker::CameraPtr &camera,
     // Capture parameters
     map.set("AcquisitionMode", "Continuous");
 
-    if (thread::env.FRAMERATE) {
-      const auto env_rate = std::string(thread::env.FRAMERATE);
+    if (std::getenv("FPS") != nullptr) {
+      const auto env_rate = std::string(std::getenv("FPS"));
       const double rate = std::stod(env_rate);
       std::cerr << "[thread::capture] Setting framerate to " << rate
                 << " (raw: " << env_rate << ")" << std::endl;
@@ -44,11 +44,11 @@ void configure(Spinnaker::CameraPtr &camera,
       map.set("AcquisitionFrameRateEnable", false);
     }
 
-    double exp = thread::env.EXPOSURE ? std::stod(thread::env.EXPOSURE) * 1000.0
-                                      : 1000.0;
-    if (thread::env.EXPOSURE)
-      std::cerr << "[thread::capture] Setting exposure to " << exp / 1000.0
-                << " ms" << std::endl;
+    double exp = (std::getenv("EXP") != nullptr)
+                     ? std::stod(std::getenv(("EXP"))) * 1000.0
+                     : 1000.0;
+    std::cerr << "[thread::capture] Setting exposure to " << exp / 1000.0
+              << " ms" << std::endl;
     map.set("ExposureAuto", "Off");
     map.set("ExposureTime", is_zoom_camera ? exp * 30.0 : exp * 1.0);
     map.set("GainAuto", "Off");

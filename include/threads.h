@@ -12,11 +12,6 @@ namespace thread {
 
 extern bool flag_exit;
 
-extern struct Env {
-  char *FRAMERATE;
-  char *EXPOSURE;
-} env;
-
 void capture(Spinnaker::CameraPtr &camera,
              Threading::FastIO<cv::Mat> &pipe_out);
 

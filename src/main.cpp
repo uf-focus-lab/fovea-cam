@@ -47,9 +47,6 @@ int main(const int argc, const char **argv) {
   if (argc < 2)
     return kiosk(argv);
   const auto task = std::string(argv[1]);
-  // Get env pointers
-  thread::env.FRAMERATE = std::getenv("FPS");
-  thread::env.EXPOSURE = std::getenv("EXP");
   // Register signal handler
   signal(SIGINT, close_all_pipes);
   signal(SIGKILL, close_all_pipes);

@@ -71,32 +71,35 @@ public:
   Tile &fill(cv::Scalar color, double x2 = 1, double y2 = 1) {
     return fill(color, 0, x2, 0, y2);
   }
-  Tile &text(std::string text, cv::Scalar color, double pad = 0.25) {
-    const unsigned height = content.height;
-    // Center position
-    const int fs = content.height / 8, ft = fs * 1.2;
-    const cv::Size t_canvas_size =
-        cv::getTextSize(text, cv::FONT_HERSHEY_DUPLEX, fs, ft, nullptr);
-    // 2p = 1 - h / (h + 2x) => x = (1 - 1/(1 -2p)) - h) / 2
-    const int fp = rint(double(t_canvas_size.height) * pad / (1 - 2 * pad));
-    const cv::Size t_bleed_size =
-        cv::Size(t_canvas_size.width + fp * 2, t_canvas_size.height + fp * 2);
-    // Create canvas for text mask
-    cv::Mat mask(t_bleed_size, CV_8UC1, cv::Scalar(0));
-    cv::putText(mask, text, cv::Point(fp, t_bleed_size.height - fp),
-                cv::FONT_HERSHEY_DUPLEX, fs, cv::Scalar(255), ft);
-    // Resize to fit
-    const double scale = (double)height / (double)t_bleed_size.height;
-    std::cout << "scale=" << scale << std::endl;
-    cv::resize(mask, mask, cv::Size(), scale, scale, cv::INTER_AREA);
-    const cv::Size size = mask.size();
-    const cv::Rect roi =
-        cv::Rect((bbox.width - size.width) / 2, (bbox.height - size.height) / 2,
-                 size.width, size.height);
-    // Convert to colored mask
-    cv::Mat text_mat(size, CV_8UC4, color);
-    // Apply text mat with given color
-    cv::copyTo(text_mat, mat(roi), mask);
+  Tile &text(std::string text, cv::Scalar color, double pad = 0.3) {
+    try {
+      const unsigned height = content.height;
+      // Center position
+      const int fs = content.height / 32, ft = fs * 1.2;
+      const cv::Size t_canvas_size =
+          cv::getTextSize(text, cv::FONT_HERSHEY_DUPLEX, fs, ft, nullptr);
+      // 2p = 1 - h / (h + 2x) => x = (1 - 1/(1 -2p)) - h) / 2
+      const int fp = rint(double(t_canvas_size.height) * pad / (1 - 2 * pad));
+      const cv::Size t_bleed_size =
+          cv::Size(t_canvas_size.width + fp * 2, t_canvas_size.height + fp * 2);
+      // Create canvas for text mask
+      cv::Mat mask(t_bleed_size, CV_8UC1, cv::Scalar(0));
+      cv::putText(mask, text, cv::Point(fp, t_bleed_size.height - fp),
+                  cv::FONT_HERSHEY_DUPLEX, fs, cv::Scalar(255), ft);
+      // Resize to fit
+      const double scale = (double)height / (double)t_bleed_size.height;
+      cv::resize(mask, mask, cv::Size(), scale, scale, cv::INTER_AREA);
+      const cv::Size size = mask.size();
+      const cv::Rect roi =
+          cv::Rect((bbox.width - size.width) / 2,
+                   (bbox.height - size.height) / 2, size.width, size.height);
+      // Convert to colored mask
+      cv::Mat text_mat(size, CV_8UC4, color);
+      // Apply text mat with given color
+      cv::copyTo(text_mat, mat(roi), mask);
+    } catch (cv::Exception &e) {
+      std::cerr << LOG_NAME "Failed to render text: " << e.what() << std::endl;
+    }
     return *this;
   }
   bool handle(PointerEvent pos) {
@@ -122,14 +125,18 @@ int contains(cv::Rect rect, PointerEvent pos) {
 
 extern char **environ;
 
+std::string EXP(double v) { return str(v * 20); }
+
+std::string FPS(double v) { return v > 0.1 ? str(v * 110 - 10.5) : "N/A"; }
+
 int run(graphics::X11FB &fb, const char *_argv[], double exp, double fps,
         std::string cmd) {
   std::vector<const char *> argv;
   if (exp < 0.01)
     exp = 0.01;
-  std::cout << str("EXP=", exp * 10) << " ";
+  std::cout << "EXP=" << EXP(exp) << " ";
   if (fps > 0.1)
-    std::cout << str("FPS=", fps * 110 - 10.5) << " ";
+    std::cout << "FPS=" << FPS(fps) << " ";
   std::cout << _argv[0] << " " << cmd;
   return 0;
 }
@@ -196,16 +203,13 @@ int kiosk(const char *argv[]) {
     PointerEvent pos = fb.wait_pointer();
     // Check for corresponding tile
     if (exp.handle(pos)) {
-      exp.fill(bg)
-          .fill(fg, exp.value)
-          .text(str("EXP = ", exp.value * 10), stroke);
+      exp.fill(bg).fill(fg, exp.value).text("EXP = " + EXP(exp.value), stroke);
       canvas.show(exp.mat, exp.bbox).apply(fb.buffer());
       fb.sync();
     }
     if (fps.handle(pos)) {
-      std::string value =
-          fps.value > 0.1 ? str("FPS = ", fps.value * 110 - 10.5) : "N/A";
-      fps.fill(bg).fill(fg, fps.value).text("FPS = " + value, stroke);
+      std::string value = "FPS = " + FPS(fps.value);
+      fps.fill(bg).fill(fg, fps.value).text(value, stroke);
       canvas.show(fps.mat, fps.bbox).apply(fb.buffer());
       fb.sync();
     }

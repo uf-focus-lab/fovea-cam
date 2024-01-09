@@ -82,11 +82,15 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
   // SET_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
   SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
-  SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
   // Setup MEMS driver
   SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
   // Start recv thread
   std::thread recv([&]() { recv_thread(serial, pos_out); });
+  // Wait for a while before pushing position
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
   // Infinite loop until closed
   try {
     while (!flag_exit) {
@@ -98,8 +102,8 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
       // Send position until ACK
       bool flag_next = false;
       while (!flag_next && !flag_exit) {
-        // std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
-        //           << ")" << std::endl;
+        std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+                  << ")" << std::endl;
         // Send frame
         SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
         // Check for ACK
@@ -110,6 +114,14 @@ void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
         flag_next = self.ack && !self.rej;
         self.ack = self.rej = 0;
         lock.unlock();
+        if (!flag_next) {
+          CLR_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+          SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+          SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
       }
     }
   } catch (Threading::END &) {

@@ -19,9 +19,7 @@ static inline double clamp(double val, double min, double max) {
 static const double SCALE = 4.65;
 
 namespace calib {
-cv::Rect roi(const double Vx, const double Vy, const int W,
-             const int H) {
-
+cv::Rect roi(const double Vx, const double Vy, const int W, const int H) {
   const double Px = Cx.x * Vx + Cx.y * Vy + Cx.xy * Vx * Vy + Cx.c,
                Py = Cy.x * Vx + Cy.y * Vy + Cy.xy * Vx * Vy + Cy.c;
   const int x = (1.0 - 1.0 / Cx.x) * (double)(W) / 2.0 + Px,

@@ -47,6 +47,9 @@ void capture(std::vector<std::thread> &threads) {
     try {
       auto prev_fovea = fovea_pipes[1]->read();
       auto prev_pos = pos_real.read();
+      struct {
+        int x, y;
+      } prev = {0, 0};
       flag_start = true;
       while (true) {
         // Get latest image
@@ -63,6 +66,10 @@ void capture(std::vector<std::thread> &threads) {
         // Get common filename
         std::stringstream ss;
         const int x = round(pos->x) + 90, y = round(pos->y) + 90;
+        if (x == prev.x && y == prev.y)
+          continue;
+        else
+          prev = {x, y};
         // Hex
         ss << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
            << x << '-' << std::setw(2) << y;

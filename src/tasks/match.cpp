@@ -61,9 +61,7 @@ void match(std::vector<std::thread> &threads) {
         if (theta >= 2 * M_PI)
           theta -= 2 * M_PI;
         const double x = r * cos(theta), y = r * sin(theta);
-        std::cerr << "[task::match::pos_out] writing next..." << std::endl;
         global::pos_next.write({x, y, 2});
-        std::cerr << "[task::match::pos_out] writing done..." << std::endl;
       }
     } catch (Threading::END &) {
       // Normal termination
