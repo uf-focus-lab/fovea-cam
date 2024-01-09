@@ -73,21 +73,22 @@ public:
   }
   Tile &text(std::string text, cv::Scalar color, double pad = 0.3) {
     try {
-      const unsigned height = content.height;
       // Center position
       const int fs = content.height / 32, ft = fs * 1.2;
-      const cv::Size t_canvas_size =
+      const cv::Size text_size =
           cv::getTextSize(text, cv::FONT_HERSHEY_DUPLEX, fs, ft, nullptr);
       // 2p = 1 - h / (h + 2x) => x = (1 - 1/(1 -2p)) - h) / 2
-      const int fp = rint(double(t_canvas_size.height) * pad / (1 - 2 * pad));
-      const cv::Size t_bleed_size =
-          cv::Size(t_canvas_size.width + fp * 2, t_canvas_size.height + fp * 2);
+      const int fp = rint(double(text_size.height) * pad / (1 - 2 * pad));
+      const cv::Size bleed_size =
+          cv::Size(text_size.width + fp * 2, text_size.height + fp * 2);
       // Create canvas for text mask
-      cv::Mat mask(t_bleed_size, CV_8UC1, cv::Scalar(0));
-      cv::putText(mask, text, cv::Point(fp, t_bleed_size.height - fp),
+      cv::Mat mask(bleed_size, CV_8UC1, cv::Scalar(0));
+      cv::putText(mask, text, cv::Point(fp, bleed_size.height - fp),
                   cv::FONT_HERSHEY_DUPLEX, fs, cv::Scalar(255), ft);
       // Resize to fit
-      const double scale = (double)height / (double)t_bleed_size.height;
+      const double scale =
+          std::min((double)content.height / (double)bleed_size.height,
+                   (double)content.width / (double)bleed_size.width);
       cv::resize(mask, mask, cv::Size(), scale, scale, cv::INTER_AREA);
       const cv::Size size = mask.size();
       const cv::Rect roi =
