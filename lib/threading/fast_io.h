@@ -5,7 +5,7 @@
 #include <memory>
 #include <mutex>
 
-namespace Threading {
+namespace threading {
 
 template <typename T> class FastIO {
 private:
@@ -51,4 +51,4 @@ public:
   }
 };
 
-} // namespace Threading
+} // namespace threading

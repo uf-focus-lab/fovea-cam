@@ -1,8 +1,8 @@
 #pragma once
 #include <exception>
 
-namespace Threading {
+namespace threading {
 
 class END : public std::exception {};
 
-} // namespace Threading
+} // namespace threading

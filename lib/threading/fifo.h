@@ -7,7 +7,7 @@
 #include <queue>
 #include <thread>
 
-namespace Threading {
+namespace threading {
 
 template <typename T> class FIFO {
 private:
@@ -25,7 +25,7 @@ private:
     if (closed) {
       lock.unlock();
       cond_w.notify_all();
-      throw Threading::END();
+      throw threading::END();
     }
     queue.push(data);
     cond_w.notify_all();
@@ -38,7 +38,7 @@ private:
     if (closed) {
       lock.unlock();
       cond_w.notify_all();
-      throw Threading::END();
+      throw threading::END();
     }
     queue.push(data);
     cond_w.notify_all();
@@ -63,7 +63,7 @@ public:
     if (closed) {
       lock.unlock();
       cond_r.notify_all();
-      throw Threading::END();
+      throw threading::END();
     }
     T data = queue.front();
     queue.pop();
@@ -85,4 +85,4 @@ public:
   }
 };
 
-} // namespace Threading
+} // namespace threading

@@ -28,6 +28,7 @@ public:
   cv::Mat bg, fg, rasterized;
   cv::Point2d val = {0, 0};
   Tile(cv::Rect bbox, int pad = 0);
+  bool is_active();
   cv::Rect loc();
   cv::Rect loc(cv::Rect bbox, int pad = 0);
   cv::Point2d relative(int x, int y);

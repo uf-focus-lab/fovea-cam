@@ -11,7 +11,7 @@
 namespace threads {
 
 #undef LOGNAME
-#define LOGNAME "[threads::aruco]"
+#define LOGNAME "[threads:aruco]"
 
 unsigned counter = 0;
 
@@ -75,7 +75,7 @@ void aruco(MatPipe &pipe_mat_in,
       }
       pipe_info_out.write(info);
     }
-  } catch (Threading::END &e) {
+  } catch (threading::END &e) {
     std::cerr << LOGNAME " PIPE END" << std::endl;
   } catch (std::exception &e) {
     std::cerr << LOGNAME "  " << e.what() << std::endl;

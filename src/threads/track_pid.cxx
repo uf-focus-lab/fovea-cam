@@ -7,7 +7,7 @@
 #include <sstream>
 
 #undef LOGNAME
-#define LOGNAME "[threads::track_pid]"
+#define LOGNAME "[threads:track_pid]"
 
 // If the center of the marker is within this distance from the center of the
 // image, no correction will be performed.
@@ -78,7 +78,7 @@ void track_pid(ArUcoPipe &wide_info_in, ArUcoPipe &fovea_info_in,
       }
       prev_id = fovea.id;
     };
-  } catch (Threading::END &e) {
+  } catch (threading::END &e) {
     std::cerr << LOGNAME " PIPE END" << std::endl;
   } catch (std::exception &e) {
     std::cerr << LOGNAME " " << e.what() << std::endl;

@@ -12,7 +12,7 @@
 #include <X11/Xutil.h>
 
 #undef LOG_NAME
-#define LOG_NAME "[graphics::x11] "
+#define LOG_NAME "[graphics::X11] "
 
 XVisualInfo *getVisualInfo(Display *display, int screen_number) {
   auto vinfo = new XVisualInfo;

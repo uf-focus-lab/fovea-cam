@@ -10,15 +10,22 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
-#include <thread>
 
 int run_task(const std::string task) {
-  global::init_devices();
   // Register signal handlers
   global::init_signal();
+  // Initialize devices
+  global::init_devices();
   // Create general pipes
   Context ctx;
+  // General threads
+  std::cerr << "[main] Launching worker threads" << task << std::endl;
+  ctx.threads.push_back({"capture/wide", threads::capture_wide(ctx)});
+  ctx.threads.push_back({"capture/fovea", threads::capture_fovea(ctx)});
+  ctx.threads.push_back({"mems/tx", threads::mems_tx(ctx)});
+  ctx.threads.push_back({"mems/rx", threads::mems_rx(ctx)});
   // Task specific threads
+  std::cerr << "[main] Launching task: " << task << std::endl;
   // if (task == "tune")
   //   tasks::tune(ctx);
   // else if (task == "track")
@@ -30,19 +37,14 @@ int run_task(const std::string task) {
     tasks::match(ctx);
   else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
-    exit(1);
+    ctx.close();
+    ctx.join();
+    global::deinit_devices();
+    std::exit(1);
   }
-  // General threads
-  ctx.threads.push_back({"capture/wide", threads::capture_wide(ctx)});
-  ctx.threads.push_back({"capture/fovea", threads::capture_fovea(ctx)});
-  ctx.threads.push_back({"mems/tx", threads::mems_tx(ctx)});
-  ctx.threads.push_back({"mems/rx", threads::mems_rx(ctx)});
+  std::cerr << "[main] Task " << task << " finished" << std::endl;
   // Wait for threads to terminate
-  for (auto &el : ctx.threads) {
-    std::cerr << "[main] Waiting for " << el.name << std::endl;
-    el.thread.join();
-  }
-  ctx.threads.clear();
+  ctx.join();
   // Recover signal handlers
   global::deinit_signal();
   return 0;

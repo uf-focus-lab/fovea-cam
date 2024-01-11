@@ -118,7 +118,7 @@ std::thread threads::mems_tx(Context &ctx) {
           }
         }
       }
-    } catch (Threading::END &) {
+    } catch (threading::END &) {
       // Normal termination
     } catch (std::runtime_error &e) {
       std::cerr << LOG_NAME " " << e.what() << std::endl;
@@ -134,7 +134,7 @@ std::thread threads::mems_tx(Context &ctx) {
     SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
     // Close all pipes
     ctx.close();
-    std::cerr << LOG_NAME " terminated." << std::endl;
+    std::cerr << LOG_NAME " terminated.\n";
   });
 }
 
@@ -256,7 +256,7 @@ std::thread threads::mems_rx(Context &ctx) {
           serial_flush(device);
         }
       }
-    } catch (Threading::END &) {
+    } catch (threading::END &) {
       // Normal termination
     } catch (std::runtime_error &e) {
       std::cerr << LOG_NAME " " << e.what() << std::endl;
@@ -264,6 +264,6 @@ std::thread threads::mems_rx(Context &ctx) {
       std::cerr << LOG_NAME " Unknown exception" << std::endl;
     }
     ctx.close();
-    std::cerr << LOG_NAME " terminated." << std::endl;
+    std::cerr << LOG_NAME " terminated.\n";
   });
 }

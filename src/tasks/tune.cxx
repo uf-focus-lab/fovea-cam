@@ -34,7 +34,7 @@ void move() {
       pos_next->write({0, 0});
       pos_next->write({0, 0});
       std::this_thread::sleep_for(std::chrono::seconds(1));
-    } catch (Threading::END &) {
+    } catch (threading::END &) {
       // Normal termination
     }
     // Close position pipe upon fifo emptied

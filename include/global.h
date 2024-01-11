@@ -61,18 +61,19 @@ typedef struct {
 
 } // namespace global
 
-typedef Threading::FIFO<mems::Position> PosFIFO;
-typedef Threading::FIFO<std::shared_ptr<mems::SyncWindow>> SyncFIFO;
-typedef Threading::FastIO<cv::Mat> MatPipe;
-typedef Threading::FastIO<global::Fovea> FoveaPipe;
+typedef threading::FIFO<mems::Position> PosFIFO;
+typedef threading::FIFO<std::shared_ptr<mems::SyncWindow>> SyncFIFO;
+typedef threading::FastIO<cv::Mat> MatPipe;
+typedef threading::FastIO<global::Fovea> FoveaPipe;
 
-typedef struct {
+typedef struct Context {
   std::vector<global::ThreadInfo> threads;
   PosFIFO mems_pos;
   SyncFIFO mems_sync;
   MatPipe cap_wide;
   FoveaPipe cap_fovea;
   void close();
+  void join();
 } Context;
 
-typedef Threading::FastIO<std::vector<global::ArUcoInfo>> ArUcoPipe;
+typedef threading::FastIO<std::vector<global::ArUcoInfo>> ArUcoPipe;

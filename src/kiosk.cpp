@@ -70,7 +70,7 @@ int kiosk() {
   // Prepare tiles for interaction
   const int w = fb.shape().width, h = fb.shape().height / 2 / 4,
             pad = rint(double(h) / 8.f);
-  const cv::Scalar bg(32, 32, 32, 255);
+  const cv::Scalar bg(16, 16, 16, 255);
   const cv::Scalar gr(96, 80, 64, 255);
   const cv::Scalar fg(104, 221, 237, 255);
   int y = fb.shape().height / 2;
@@ -109,7 +109,7 @@ int kiosk() {
   std::cerr << LOG_NAME "Start interaction" << std::endl;
   // Enter event loop
   std::string task = "";
-  while (!global::flag_term) {
+  while (1) {
     if (task != "") {
       run_task(task);
       task = "";
@@ -125,22 +125,42 @@ int kiosk() {
     if (gain.handle(pos)) {
       gain.fill(bg).fill(gr, gain.val.x);
     }
-    if (btn_tune.handle(pos)) {
+    if (btn_tune.is_active()) {
+      if (!btn_tune.handle(pos)) {
+        btn_tune.fill(bg);
+        task = "move";
+      }
+    } else if (btn_tune.handle(pos)) {
       btn_tune.fill(gr);
-      task = "move";
     }
-    if (btn_track.handle(pos)) {
+
+    if (btn_track.is_active()) {
+      if (!btn_track.handle(pos)) {
+        btn_track.fill(bg);
+        task = "track";
+      }
+    } else if (btn_track.handle(pos)) {
       btn_track.fill(gr);
-      task = "track";
     }
-    if (btn_match.handle(pos)) {
+
+    if (btn_match.is_active()) {
+      if (!btn_match.handle(pos)) {
+        btn_match.fill(bg);
+        task = "match";
+      }
+    } else if (btn_match.handle(pos)) {
       btn_match.fill(gr);
-      task = "match";
     }
-    if (btn_rec.handle(pos)) {
+
+    if (btn_rec.is_active()) {
+      if (!btn_rec.handle(pos)) {
+        btn_rec.fill(bg);
+        task = "capture";
+      }
+    } else if (btn_rec.handle(pos)) {
       btn_rec.fill(gr);
-      task = "capture";
     }
+
     canvas.show(tiles).apply(fb, &pos);
   }
   return 0;

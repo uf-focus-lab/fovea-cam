@@ -1,5 +1,6 @@
 #include "global.h"
 
+#include <csignal>
 #include <glob.h>
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -18,6 +19,14 @@ void Context::close() {
   cap_fovea.close();
   mems_pos.close();
   mems_sync.close();
+}
+
+void Context::join() {
+  for (auto &el : threads) {
+    std::cerr << "[global::context] Waiting for " << el.name << std::endl;
+    el.thread.join();
+  }
+  threads.clear();
 }
 
 namespace global {
@@ -69,6 +78,12 @@ Spinnaker::CameraPtr wide_camera(nullptr);
 Spinnaker::CameraPtr fovea_camera(nullptr);
 
 void init_devices() {
+  signal(SIGSEGV, [](int) {
+    std::cerr << "[init] Segmentation fault, trying to exit gracefully."
+              << std::endl;
+    global::deinit_devices();
+    std::exit(1);
+  });
   // Initialize serial port
   if (mems == nullptr) {
     std::cerr << "[init] Looking for MEMS driver." << std::endl;
@@ -90,8 +105,9 @@ void init_devices() {
       } else if (model.ends_with("BFS-U3-16S2C-BD")) {
         // fovea camera
         fovea_camera = camera;
+      } else {
+        camera->DeInit();
       }
-      camera->DeInit();
     }
     camList.Clear();
   }
@@ -99,7 +115,7 @@ void init_devices() {
   if (wide_camera == nullptr || fovea_camera == nullptr) {
     std::cerr << "[main] Unable to find cameras." << std::endl;
     deinit_devices();
-    exit(1);
+    std::exit(1);
   }
 }
 

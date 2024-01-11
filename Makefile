@@ -35,8 +35,9 @@ init:
 	sudo systemctl enable Xorg.service
 	sudo systemctl restart Xorg.service
 
+TASK ?=
 start: release
-	sudo build/FoveaCam
+	sudo build/FoveaCam $(TASK)
 
 include $(wildcard scripts/*.mk)
 

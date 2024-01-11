@@ -11,7 +11,7 @@ typedef struct {
   } X, Y;
 } Coeff;
 
-extern Coeff V, P;
+extern Coeff VtoP, PtoV;
 
 cv::Point2d cvt(Coeff C, double x, double y);
 

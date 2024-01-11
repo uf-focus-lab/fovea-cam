@@ -4,13 +4,19 @@
 #include "util/assert.h"
 #include "util/spinnaker.h"
 #include "util/time.h"
+
+#include <mutex>
 #include <tuple>
 
 #undef LOGNAME
-#define LOGNAME "[threads::capture::configure]"
+#define LOGNAME "[threads:capture:configure]"
+
+// Only one thread can configure the camera at a time
+std::mutex config_mtx;
 
 void configure(const Spinnaker::CameraPtr &camera,
                const bool is_zoom_camera = false) {
+  std::lock_guard<std::mutex> lock(config_mtx);
   std::cerr << LOGNAME " Setting up " << camera->DeviceModelName().c_str()
             << std::endl;
   { // Camera parameters
@@ -33,10 +39,10 @@ void configure(const Spinnaker::CameraPtr &camera,
     } else {
       map.set("AcquisitionFrameRateEnable", false);
     }
-    std::cerr << "[threads::capture] Setting exposure to "
-              << global::config.exp / 1000.0 << " ms" << std::endl;
+    std::cerr << "[threads::capture] Setting exposure to " << global::config.exp
+              << " ms" << std::endl;
     map.set("ExposureAuto", "Off");
-    map.set("ExposureTime", global::config.exp);
+    map.set("ExposureTime", global::config.exp * 1000.0);
     map.set("GainAuto", "Off");
     map.set("Gain", is_zoom_camera ? global::config.gain : 0.0);
     // Image format
@@ -53,47 +59,49 @@ void configure(const Spinnaker::CameraPtr &camera,
     // Only latest buffer is used, old buffers are dropped.
     map.set("StreamBufferHandlingMode", "NewestOnly");
   }
+  try {
+    camera->BeginAcquisition();
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << LOGNAME "BeginAcquisition(): " << e.what() << std::endl;
+  }
 }
 
-typedef Threading::FIFO<std::tuple<Spinnaker::ImagePtr, unsigned long>> CapPipe;
+typedef threading::FIFO<std::tuple<Spinnaker::ImagePtr, unsigned long>> CapPipe;
 
 #undef LOGNAME
-#define LOGNAME "[threads::capture::readout]"
+#define LOGNAME "[threads:capture:readout] "
 
-std::thread readout(const Spinnaker::CameraPtr &camera, CapPipe &out) {
-  return std::thread([&]() {
-    try {
-      camera->BeginAcquisition();
-      while (!global::flag_term) {
-        out.write({camera->GetNextImage(), Time::us()});
-      }
-    } catch (Threading::END &) {
-      // Normal termination
-    } catch (Spinnaker::Exception &e) {
-      std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
-    } catch (...) {
-      std::cerr << LOGNAME "Unknown Error" << std::endl;
+void readout(const Spinnaker::CameraPtr &camera, CapPipe &out) {
+  try {
+    while (!global::flag_term) {
+      out.write({camera->GetNextImage(), Time::us()});
     }
-    out.close();
-    // Release camera instance
-    try {
-      camera->EndAcquisition();
-      camera->DeInit();
-    } catch (Spinnaker::Exception &e) {
-      std::cerr << LOGNAME "Error: " << e.what() << std::endl;
-    }
-  });
+  } catch (threading::END &) {
+    // Normal termination
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
+  } catch (...) {
+    std::cerr << LOGNAME "Unknown Error" << std::endl;
+  }
+  out.close();
+  // Release camera instance
+  try {
+    std::cerr << LOGNAME "Stopping " +
+                     std::string(camera->DeviceModelName().c_str()) + "\n";
+    camera->EndAcquisition();
+  } catch (Spinnaker::Exception &e) {
+    std::cerr << LOGNAME "Error: " << e.what() << std::endl;
+  }
 };
 
 #undef LOGNAME
-#define LOGNAME "[threads::capture::wide]"
+#define LOGNAME "[threads:capture:wide] "
 
 std::thread threads::capture_wide(Context &ctx) {
   return std::thread([&]() {
     auto &out = ctx.cap_wide;
     const auto &camera = global::wide_camera;
     try {
-      camera->Init();
       configure(camera);
     } catch (std::exception &e) {
       std::cerr << LOGNAME "Error: " << e.what() << std::endl;
@@ -101,7 +109,7 @@ std::thread threads::capture_wide(Context &ctx) {
       return;
     }
     CapPipe cap;
-    auto reader = readout(camera, cap);
+    std::thread reader(readout, std::ref(camera), std::ref(cap));
     try {
       while (!global::flag_term) {
         auto tuple = cap.read();
@@ -109,7 +117,7 @@ std::thread threads::capture_wide(Context &ctx) {
         auto mat = Spinnaker::fromImagePtr(img_ptr, 1);
         out.write(mat);
       }
-    } catch (Threading::END &e) {
+    } catch (threading::END &e) {
       // Normal termination
     }
     CATCH_ASSERT(LOGNAME);
@@ -121,16 +129,15 @@ std::thread threads::capture_wide(Context &ctx) {
 }
 
 #undef LOGNAME
-#define LOGNAME "[threads::capture::fovea]"
+#define LOGNAME "[threads:capture:fovea]"
 
 // Fovea camera
 std::thread threads::capture_fovea(Context &ctx) {
   return std::thread([&]() {
     auto &sync = ctx.mems_sync;
     auto &out = ctx.cap_fovea;
-    const auto &camera = global::wide_camera;
+    const auto &camera = global::fovea_camera;
     try {
-      camera->Init();
       configure(camera, true);
     } catch (std::exception &e) {
       std::cerr << "Error: " << e.what() << std::endl;
@@ -138,7 +145,7 @@ std::thread threads::capture_fovea(Context &ctx) {
       return;
     }
     CapPipe cap;
-    auto reader = readout(camera, cap);
+    std::thread reader(readout, std::ref(camera), std::ref(cap));
     try {
       auto sync_window = sync.read();
       while (!global::flag_term) {
@@ -157,11 +164,13 @@ std::thread threads::capture_fovea(Context &ctx) {
                    .y = sync_window->position.y,
                    .mat = mat});
       }
-    } catch (Threading::END &e) {
+    } catch (threading::END &e) {
       // Normal termination
     }
     CATCH_ASSERT(LOGNAME);
     ctx.close();
+    cap.close();
+    reader.join();
     std::cerr << LOGNAME " terminated." << std::endl;
   });
 }

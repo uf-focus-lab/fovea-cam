@@ -27,6 +27,13 @@ Tile::Tile(cv::Rect box, int p)
   init();
 }
 
+bool Tile::is_active() { return active; }
+
+// bool Tile::button(PointerEvent *pos, cv::Scalar bg_normal,
+//                   cv::Scalar bg_active) {
+//   auto _active = active;
+// }
+
 cv::Rect Tile::loc() { return cv::Rect(bbox); }
 cv::Rect Tile::loc(cv::Rect box, int pad) {
   bbox = {box.x + pad, box.y + pad, box.width - pad * 2, box.height - pad * 2};
@@ -51,8 +58,14 @@ cv::Mat Tile::raster() {
 }
 
 Tile &Tile::fill(cv::Mat img) {
-  // Scale down to fit, retain aspect ratio
+  updated = true;
   if (img.cols > bbox.width || img.rows > bbox.height) {
+    // Scale down to fit, retain aspect ratio
+    const auto ratio = std::min(bbox.width / static_cast<double>(img.cols),
+                                bbox.height / static_cast<double>(img.rows));
+    cv::resize(img, img, cv::Size(), ratio, ratio);
+  } else if (img.cols < bbox.width && img.rows < bbox.height) {
+    // Scale up to fit, retain aspect ratio
     const auto ratio = std::min(bbox.width / static_cast<double>(img.cols),
                                 bbox.height / static_cast<double>(img.rows));
     cv::resize(img, img, cv::Size(), ratio, ratio);

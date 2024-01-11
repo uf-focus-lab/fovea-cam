@@ -32,7 +32,7 @@ void tasks::capture(Context &ctx) {
       }
       // Broadcast idle position
       pos_next->write({0, 0, 2});
-    } catch (Threading::END &) {
+    } catch (threading::END &) {
       // Normal termination
     }
     // Close position pipe upon fifo emptied
@@ -81,7 +81,7 @@ void tasks::capture(Context &ctx) {
         prev_fovea = fovea;
         prev_pos = pos;
       }
-    } catch (Threading::END &) {
+    } catch (threading::END &) {
       // Normal termination
     }
   }));
