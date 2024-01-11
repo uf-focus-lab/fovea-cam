@@ -75,9 +75,9 @@ int kiosk() {
   const cv::Scalar fg(104, 221, 237, 255);
   int y = fb.shape().height / 2;
   // Tile for splash image
-  const cv::Mat splash(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
-                       (char *)SPLASH_PNG_DATA);
-  canvas.clear().show(splash, pad_rect(0, 0, w, y, pad));
+  const cv::Mat splash_mat(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
+                           (char *)SPLASH_PNG_DATA);
+  Tile splash({0, 0, w, y}, pad);
   // Tile for FPS slider
   Tile fps(cv::Rect{0, y, w, h}, pad);
   // Tile for EXP slider
@@ -96,6 +96,7 @@ int kiosk() {
       btn_rec(cv::Rect{3 * w / 4, y, w / 4, h}, pad);
 
   std::vector<Tile *> tiles = {
+      &splash.fill(splash_mat),
       &fps.fill(bg).fill(gr, fps.val.x).text(FPS, fg),
       &exp.fill(bg).fill(gr, exp.val.x).text(EXP, fg),
       &gain.fill(bg).fill(gr, gain.val.x).text(GAIN, fg),
