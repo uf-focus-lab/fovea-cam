@@ -30,15 +30,17 @@ private:
   cv::Mat mat, cursor_up, cursor_down;
   int cursor_size = 0;
   int transform = transform::NONE;
-  void cursor_init(int size);
-  void constructor(std::string fb_path, int transform);
   unsigned int width, height;
+  PointerEvent *pe = nullptr;
+  void cursor_init(int size);
+  cv::Mat handle_pointer(const PointerEvent *e);
 
 public:
   Canvas(cv::Size size);
   Canvas(cv::Size size, unsigned line_length);
   Canvas(unsigned width, unsigned height);
   Canvas(unsigned width, unsigned height, unsigned line_length);
+  ~Canvas();
   int get_transform();
   int set_transform(int);
   // Create a fork of framebuffer in new process

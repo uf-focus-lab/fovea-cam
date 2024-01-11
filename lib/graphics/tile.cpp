@@ -96,10 +96,15 @@ Tile &Tile::text(std::string text, cv::Scalar color, unsigned height,
   try {
     // Clear foreground
     fg = color;
-    // Center position
-    const int fs = height / 16, ft = fs * 1.6;
-    const cv::Size text_size =
-        cv::getTextSize(text, cv::FONT_HERSHEY_DUPLEX, fs, ft, nullptr);
+    // Get the basis for text size
+    const auto base_size =
+        cv::getTextSize("BASE", cv::FONT_HERSHEY_DUPLEX, 1, 2, nullptr);
+    // Get the HiDPI scaled size (factor = 2)
+    const double fs = 2 * static_cast<double>(height) /
+                      static_cast<double>(base_size.height),
+                 ft = fs * 2;
+    const auto text_size =
+        cv::getTextSize(text, cv::FONT_HERSHEY_DUPLEX, fs, rint(ft), nullptr);
     // Actual padding in px, derived from percentage
     // 2p = 1 - h / (h + 2x) => x = (1 - 1/(1 -2p)) - h) / 2
     const int p = rint(double(text_size.height) * pad / (1 - 2 * pad));

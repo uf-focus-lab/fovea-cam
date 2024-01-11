@@ -90,36 +90,42 @@ public:
   };
 
   graphics::PointerEvent wait_pointer(bool block) {
-    while (1) {
-      if (!block && !XEventsQueued(display, QueuedAfterFlush)) {
-        return graphics::PointerEvent({false});
-      }
-      static XEvent event;
-      graphics::PointerEvent pe = {.valid = true, .button_mask = 0};
-      XNextEvent(display, &event);
-      switch (event.type) {
+    if (!block && !XEventsQueued(display, QueuedAfterFlush)) {
+      return graphics::PointerEvent({false});
+    }
+    static XEvent e;
+    graphics::PointerEvent pe = {.valid = false, .button_mask = 0};
+    bool flag_return = false;
+    // Find the LAST event that needs to be processed, skip move events for
+    // faster response
+    while (!flag_return && XEventsQueued(display, QueuedAfterFlush)) {
+      XNextEvent(display, &e); // This is always blocking
+      switch (e.type) {
       case MotionNotify:
-        pe.x = event.xmotion.x;
-        pe.y = event.xmotion.y;
-        pe.button_state = buttonToMask(event.xmotion.state);
+        pe.x = e.xmotion.x;
+        pe.y = e.xmotion.y;
+        pe.button_state = buttonToMask(e.xmotion.state);
         break;
       case ButtonPress:
-        pe.x = event.xbutton.x;
-        pe.y = event.xbutton.y;
-        pe.button_mask = 1 << event.xbutton.button;
-        pe.button_state = buttonToMask(event.xbutton.state) | pe.button_mask;
+        pe.x = e.xbutton.x;
+        pe.y = e.xbutton.y;
+        pe.button_mask = 1 << e.xbutton.button;
+        pe.button_state = buttonToMask(e.xbutton.state) | pe.button_mask;
+        flag_return = true;
         break;
       case ButtonRelease:
-        pe.x = event.xbutton.x;
-        pe.y = event.xbutton.y;
-        pe.button_mask = 1 << event.xbutton.button;
-        pe.button_state = buttonToMask(event.xbutton.state) & ~pe.button_mask;
+        pe.x = e.xbutton.x;
+        pe.y = e.xbutton.y;
+        pe.button_mask = 1 << e.xbutton.button;
+        pe.button_state = buttonToMask(e.xbutton.state) & ~pe.button_mask;
+        flag_return = true;
         break;
       default:
         continue;
       }
-      return pe;
+      pe.valid = true;
     }
+    return pe;
   }
 
   ~IMPL(){

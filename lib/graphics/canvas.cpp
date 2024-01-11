@@ -81,6 +81,23 @@ void Canvas::cursor_init(int size) {
   cv::resize(cursor_down, cursor_down, s_target, 0, 0, cv::INTER_AREA);
 }
 
+cv::Mat Canvas::handle_pointer(const PointerEvent *e) {
+  if (e != nullptr) {
+    cv::Mat disp;
+    const cv::Rect dst(e->x, e->y, cursor_size, cursor_size);
+    const int bleed = cursor_size / 2;
+    cv::copyMakeBorder(mat, disp, bleed, bleed, bleed, bleed,
+                       cv::BORDER_CONSTANT, color::black(255));
+    auto cursor = disp(dst).clone();
+    auto c = cv::Mat(dst.size(), CV_8UC4, color::red(128));
+    alpha_blend(cursor, e->is_down(1) ? cursor_down : cursor_up);
+    cursor.copyTo(disp(dst));
+    return disp(cv::Rect(bleed, bleed, width, height)).clone();
+  } else {
+    return mat;
+  }
+}
+
 Canvas::Canvas(cv::Size size) : mat(size.height, size.width, CV_8UC4) {
   this->width = size.width;
   this->height = size.height;
@@ -105,6 +122,13 @@ Canvas::Canvas(unsigned width, unsigned height, unsigned line_length)
   this->width = width;
   this->height = height;
   cursor_init(std::min(width, height) / 8);
+}
+
+Canvas::~Canvas() {
+  if (pe != nullptr) {
+    delete pe;
+    pe = nullptr;
+  }
 }
 
 int Canvas::get_transform() { return transform; };
@@ -207,15 +231,16 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
 Canvas &Canvas::apply(void *fb, const PointerEvent *event) {
   cv::Mat disp;
   if (event != nullptr && event->valid) {
-    const cv::Rect dst(event->x, event->y, cursor_size, cursor_size);
-    const int bleed = cursor_size / 2;
-    cv::copyMakeBorder(mat, disp, bleed, bleed, bleed, bleed,
-                       cv::BORDER_CONSTANT, color::black(255));
-    auto cursor = disp(dst).clone();
-    auto c = cv::Mat(dst.size(), CV_8UC4, color::red(128));
-    alpha_blend(cursor, event->is_down(1) ? cursor_down : cursor_up);
-    cursor.copyTo(disp(dst));
-    disp = disp(cv::Rect(bleed, bleed, width, height)).clone();
+    if (pe != nullptr) {
+      delete pe;
+      pe = nullptr;
+    }
+    // Only save the event if it is valid and pressed down
+    if (event->is_down(1))
+      pe = new PointerEvent(*event);
+    disp = handle_pointer(event);
+  } else if (pe != nullptr) {
+    disp = handle_pointer(pe);
   } else {
     disp = mat;
   }
