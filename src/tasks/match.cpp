@@ -72,19 +72,27 @@ void tasks::match(Context &ctx) {
   const int w = fb.shape().width, h = fb.shape().height;
   const int pad = w / 64;
   const int btn_h = w / 8, btn_w = w / 4;
-  const int img_h = (h - btn_h) / 2;
+  const int img_h = (h - 2 * btn_h) / 2;
   // Create tiles
-  Tile match_tile(cv::Rect{0, 0, w / 2, img_h}, pad);
-  Tile fovea_tile(cv::Rect{w / 2, 0, w / 2, img_h}, pad);
-  Tile wide_tile(cv::Rect{0, img_h, w, img_h}, pad);
-  Tile exit_btn(cv::Rect{0, img_h * 2, btn_w, btn_h}, pad);
-  Tile notes(cv::Rect{btn_w, img_h * 2, w - btn_w, btn_h}, pad);
+  int y = 0;
+  Tile match_tile(cv::Rect{0, y, w / 2, img_h}, pad);
+  Tile fovea_tile(cv::Rect{w / 2, y, w / 2, img_h}, pad);
+  y += img_h;
+  Tile wide_tile(cv::Rect{0, y, w, img_h}, pad);
+  y += img_h;
+  Tile notes(cv::Rect{0, y, w, btn_h}, pad);
+  y += btn_h;
+  Tile exit_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
+  Tile reset_btn(cv::Rect{btn_w, y, btn_w, btn_h}, pad);
+  Tile calib_btn(cv::Rect{btn_w * 2, y, btn_w * 2, btn_h}, pad);
   std::vector<Tile *> tiles = {
       &match_tile.fill(bg),
       &fovea_tile.fill(bg),
       &wide_tile.fill(bg),
+      &notes.text("current task: match", fg),
       &exit_btn.fill(color::red(64)).text("EXIT", fg),
-      &notes.text("Current task: match", fg),
+      &reset_btn.fill(color::red(64)).text("RESET", fg),
+      &calib_btn.fill(color::red(64)).text("CALIBRATE", fg),
   };
   // Render loop
   try {
@@ -131,15 +139,16 @@ void tasks::match(Context &ctx) {
         std::stringstream ss;
         // ss << "Vx: " << std::fixed << std::setprecision(2) << Vx << ", "
         //    << "Vy: " << std::fixed << std::setprecision(2) << Vy;
-        ss << "x: " << std::fixed << std::setprecision(2) << x << ", "
-           << "y: " << std::fixed << std::setprecision(2) << y;
+        ss << "src: " << wide_tile.val << ", "
+           << "dst: " << pos;
         notes.text(ss.str(), fg);
       }
 
-      if (exit_btn.handle(pos)) {
-        exit_btn.fill(color::red(128));
+      if (exit_btn.button(pos, bg, gr))
         global::flag_term = true;
-      }
+
+      if (reset_btn.button(pos, bg, gr))
+        ctx.mems_pos.write({0, 0, 0});
 
       canvas.show(tiles).apply(fb, &pos);
     }

@@ -233,11 +233,8 @@ Canvas &Canvas::apply(void *fb, const PointerEvent *event) {
   if (event != nullptr && event->valid) {
     if (pe != nullptr) {
       delete pe;
-      pe = nullptr;
     }
-    // Only save the event if it is valid and pressed down
-    if (event->is_down(1))
-      pe = new PointerEvent(*event);
+    pe = new PointerEvent(*event);
     disp = handle_pointer(event);
   } else if (pe != nullptr) {
     disp = handle_pointer(pe);

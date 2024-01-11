@@ -48,9 +48,11 @@ Coeff calib::PtoV = {.X = {1.65351813, 0.02880365, -0.01224670, -0.26734991},
                      .Y = {0.04906417, 0.59860207, -0.05216969, 0.24852338}};
 
 cv::Point2d calib::cvt(Coeff C, double x, double y) {
+  double xy = x * y;
+  const auto &CX = C.X, &CY = C.Y;
   return {
-      (x - C.X.c) / (C.X.x + C.X.xy * y),
-      (y - C.Y.c) / (C.Y.y + C.Y.xy * x),
+      CX.x * x + CX.y * y + CX.xy * xy + CX.c,
+      CY.x * x + CY.y * y + CY.xy * xy + CY.c,
   };
 }
 
