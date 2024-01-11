@@ -29,11 +29,6 @@ Tile::Tile(cv::Rect box, int p)
 
 bool Tile::is_active() { return active; }
 
-// bool Tile::button(PointerEvent *pos, cv::Scalar bg_normal,
-//                   cv::Scalar bg_active) {
-//   auto _active = active;
-// }
-
 cv::Rect Tile::loc() { return cv::Rect(bbox); }
 cv::Rect Tile::loc(cv::Rect box, int pad) {
   bbox = {box.x + pad, box.y + pad, box.width - pad * 2, box.height - pad * 2};
@@ -174,6 +169,22 @@ bool Tile::handle(PointerEvent pos) {
     }
   }
   return active;
+}
+
+bool Tile::button(PointerEvent pos, cv::Scalar bg_normal,
+                  cv::Scalar bg_active) {
+  auto const prev_active = active;
+  handle(pos);
+  // Update background accordingly
+  if (prev_active != active) {
+    // Transition of state
+    fill(active ? bg_active : bg_normal);
+    // Check if eligible as a click event
+    if (!active && contains(pos)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace graphics

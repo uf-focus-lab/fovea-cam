@@ -125,41 +125,17 @@ int kiosk() {
     if (gain.handle(pos)) {
       gain.fill(bg).fill(gr, gain.val.x);
     }
-    if (btn_tune.is_active()) {
-      if (!btn_tune.handle(pos)) {
-        btn_tune.fill(bg);
-        task = "move";
-      }
-    } else if (btn_tune.handle(pos)) {
-      btn_tune.fill(gr);
-    }
+    if (btn_tune.button(pos, bg, gr))
+      task = "move";
 
-    if (btn_track.is_active()) {
-      if (!btn_track.handle(pos)) {
-        btn_track.fill(bg);
-        task = "track";
-      }
-    } else if (btn_track.handle(pos)) {
-      btn_track.fill(gr);
-    }
+    if (btn_track.button(pos, bg, gr))
+      task = "track";
 
-    if (btn_match.is_active()) {
-      if (!btn_match.handle(pos)) {
-        btn_match.fill(bg);
-        task = "match";
-      }
-    } else if (btn_match.handle(pos)) {
-      btn_match.fill(gr);
-    }
+    if (btn_match.button(pos, bg, gr))
+      task = "match";
 
-    if (btn_rec.is_active()) {
-      if (!btn_rec.handle(pos)) {
-        btn_rec.fill(bg);
-        task = "capture";
-      }
-    } else if (btn_rec.handle(pos)) {
-      btn_rec.fill(gr);
-    }
+    if (btn_rec.button(pos, bg, gr))
+      task = "capture";
 
     canvas.show(tiles).apply(fb, &pos);
   }

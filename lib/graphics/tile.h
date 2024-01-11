@@ -42,6 +42,7 @@ public:
   Tile &text(std::string (*cb)(cv::Point2d), cv::Scalar color,
              double height = 0.6, double pad = 0.2);
   bool handle(PointerEvent pos);
+  bool button(PointerEvent pos, cv::Scalar bg_normal, cv::Scalar bg_active);
 };
 
 } // namespace graphics
