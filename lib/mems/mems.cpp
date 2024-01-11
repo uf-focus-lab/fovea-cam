@@ -56,6 +56,4 @@ int SyncWindow::test(const unsigned long time, const unsigned long offset) {
   }
 }
 
-Threading::FIFO<std::shared_ptr<SyncWindow>> sync;
-
 } // namespace mems

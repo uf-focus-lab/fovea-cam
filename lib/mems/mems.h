@@ -1,11 +1,9 @@
 #pragma once
 
-#include "fcmp/fcmp.h"
-#include "threading/fifo.h"
-#include "util/time.h"
+#include <memory>
 
-#include <iostream>
-#include <mutex>
+#include "fcmp/fcmp.h"
+#include "util/time.h"
 
 namespace mems {
 
@@ -43,7 +41,5 @@ public:
   int test(const unsigned long time = Time::us(),
            const unsigned long offset = delay);
 };
-
-extern Threading::FIFO<std::shared_ptr<mems::SyncWindow>> sync;
 
 } // namespace mems

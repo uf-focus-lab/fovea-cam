@@ -1,8 +1,9 @@
-#include "x11.h"
+#include "X11.h"
 
 #include <X11/X.h>
 #include <cstring>
 #include <glob.h>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -10,6 +11,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
+#undef LOG_NAME
 #define LOG_NAME "[graphics::x11] "
 
 XVisualInfo *getVisualInfo(Display *display, int screen_number) {
@@ -19,6 +21,14 @@ XVisualInfo *getVisualInfo(Display *display, int screen_number) {
     return nullptr;
   }
   return vinfo;
+}
+
+unsigned int buttonToMask(unsigned int btn) {
+  return (((btn & Button1Mask) ? 1 : 0) << 1) |
+         (((btn & Button2Mask) ? 1 : 0) << 2) |
+         (((btn & Button3Mask) ? 1 : 0) << 3) |
+         (((btn & Button4Mask) ? 1 : 0) << 4) |
+         (((btn & Button5Mask) ? 1 : 0) << 5);
 }
 
 class IMPL {
@@ -33,7 +43,6 @@ private:
   unsigned char *fb = NULL;
   XImage *img = NULL;
   GC gc;
-  XEvent event;
   // indicates if the window is successfully opened
   bool open = false;
 
@@ -72,30 +81,46 @@ public:
               img->height);
     }
     XSelectInput(display, window,
-                 ExposureMask | KeyPressMask | ButtonPressMask |
-                     PointerMotionMask);
+                 ExposureMask | KeyPressMask | KeyReleaseMask |
+                     PointerMotionMask | ButtonPressMask | ButtonReleaseMask);
     XGCValues gcv = {.graphics_exposures = 0};
     gc = XCreateGC(display, window, GCGraphicsExposures, &gcv);
     XMapWindow(display, window);
     open = true;
   };
 
-  PointerEvent wait_pointer(bool block) {
-    while (block || events_pending()) {
-      XNextEvent(display, &event);
-      if (event.type == MotionNotify) {
-        // Get mouse position
-        return PointerEvent{true, event.xmotion.x, event.xmotion.y, 0};
-      } else if (event.type == ButtonPress) {
-        // Get mouse button
-        return PointerEvent{true, event.xmotion.x, event.xmotion.y,
-                            event.xbutton.button};
+  graphics::PointerEvent wait_pointer(bool block) {
+    while (1) {
+      if (!block && !XEventsQueued(display, QueuedAfterFlush)) {
+        return graphics::PointerEvent({false});
       }
+      static XEvent event;
+      graphics::PointerEvent pe = {.valid = true, .button_mask = 0};
+      XNextEvent(display, &event);
+      switch (event.type) {
+      case MotionNotify:
+        pe.x = event.xmotion.x;
+        pe.y = event.xmotion.y;
+        pe.button_state = buttonToMask(event.xmotion.state);
+        break;
+      case ButtonPress:
+        pe.x = event.xbutton.x;
+        pe.y = event.xbutton.y;
+        pe.button_mask = 1 << event.xbutton.button;
+        pe.button_state = buttonToMask(event.xbutton.state) | pe.button_mask;
+        break;
+      case ButtonRelease:
+        pe.x = event.xbutton.x;
+        pe.y = event.xbutton.y;
+        pe.button_mask = 1 << event.xbutton.button;
+        pe.button_state = buttonToMask(event.xbutton.state) & ~pe.button_mask;
+        break;
+      default:
+        continue;
+      }
+      return pe;
     }
-    return PointerEvent{false, 0, 0, 0};
   }
-
-  int events_pending() { return XPending(display); }
 
   ~IMPL(){
       // if (img != NULL)
@@ -109,13 +134,15 @@ public:
       // if (display != NULL)
       //   XCloseDisplay(display);
   };
-  graphics::Shape shape() { return graphics::Shape{width, height}; };
+  cv::Size shape() {
+    return {static_cast<int>(width), static_cast<int>(height)};
+  };
   void use(void *buffer){/* TODO */};
   void sync() {
     XPutImage(display, window, gc, img, 0, 0, 0, 0, width, height);
   };
   void flush() { XFlush(display); }
-  bool isOpen() { return open; };
+  bool is_open() { return open; };
   unsigned char *buffer() { return (unsigned char *)fb; };
 };
 
@@ -125,7 +152,7 @@ X11FB::X11FB() : impl(new IMPL()){};
 
 X11FB::~X11FB() { delete (IMPL *)impl; }
 
-Shape X11FB::shape() { return ((IMPL *)impl)->shape(); }
+cv::Size X11FB::shape() { return ((IMPL *)impl)->shape(); }
 
 void X11FB::use(void *buffer) { ((IMPL *)impl)->use(buffer); }
 
@@ -133,15 +160,13 @@ void X11FB::sync() { ((IMPL *)impl)->sync(); }
 
 void X11FB::flush() { ((IMPL *)impl)->flush(); }
 
-bool X11FB::isOpen() { return ((IMPL *)impl)->isOpen(); }
+bool X11FB::is_open() { return ((IMPL *)impl)->is_open(); }
 
 unsigned char *X11FB::buffer() { return ((IMPL *)impl)->buffer(); }
 
 PointerEvent X11FB::wait_pointer(bool block) {
   return ((IMPL *)impl)->wait_pointer(block);
 }
-
-int X11FB::events_pending() { return ((IMPL *)impl)->events_pending(); }
 
 static const char *const argv_dmps[] = {"xset", "-dpms", NULL};
 static const char *const argv_soff[] = {"xset", "s", "off", NULL};

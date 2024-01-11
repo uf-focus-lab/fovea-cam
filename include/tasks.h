@@ -1,11 +1,13 @@
 #pragma once
 
-#include <thread>
-#include <vector>
+#include "global.h"
 
 namespace tasks {
-void move(std::vector<std::thread> &threads);
-void track(std::vector<std::thread> &threads);
-void match(std::vector<std::thread> &threads);
-void capture(std::vector<std::thread> &threads);
+
+// void move(Context &);
+void tune(Context &);
+void track(Context &);
+void match(Context &);
+void capture(Context &);
+
 } // namespace tasks

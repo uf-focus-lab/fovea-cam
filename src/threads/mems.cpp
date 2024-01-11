@@ -5,7 +5,6 @@
 #include "fcmp/fcmp.h"
 #include "threading/exception.h"
 #include "threading/fast_io.h"
-#include "threading/fifo.h"
 
 #include <condition_variable>
 #include <iostream>
@@ -65,92 +64,82 @@ static inline void compute_channels(const double &pos, uint16_t &ch1,
   ch2 = DIGITAL_VOLTAGE(bias - voltage_shift);
 }
 
-void recv_thread(USB::SerialDevice &device,
-                 Threading::FastIO<mems::Position> &pos_out);
-
-namespace thread {
-
 #undef LOG_NAME
-#define LOG_NAME "[thread::mems]"
+#define LOG_NAME "[threads::mems::tx]"
 
-void mems(USB::SerialDevice &serial, Threading::FIFO<mems::Position> &pos_in,
-          Threading::FastIO<mems::Position> &pos_out) {
-  // FCMP Field Buffer
-  static fcmp_field_cfg fcmp_config = {0};
-  // First reset the device
-  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-  // SET_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
-  SET_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
-  SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
-  // Setup MEMS driver
-  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-  // Start recv thread
-  std::thread recv([&]() { recv_thread(serial, pos_out); });
-  // Wait for a while before pushing position
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
-  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  // Infinite loop until closed
-  try {
-    while (!flag_exit) {
-      // Get next target position
-      auto pos = pos_in.read();
-      // Compute voltages
-      compute_channels(pos.x, pos.field.ch[0], pos.field.ch[1]);
-      compute_channels(pos.y, pos.field.ch[2], pos.field.ch[3]);
-      // Send position until ACK
-      bool flag_next = false;
-      while (!flag_next && !flag_exit) {
-        std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
-                  << ")" << std::endl;
-        // Send frame
-        SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
-        // Check for ACK
-        std::unique_lock<std::mutex> lock(self.mutex);
-        while (self.ack == 0 && self.rej == 0 && !flag_exit) {
-          self.updated.wait_for(lock, std::chrono::milliseconds(100));
-        }
-        flag_next = self.ack && !self.rej;
-        self.ack = self.rej = 0;
-        lock.unlock();
-        if (!flag_next) {
-          CLR_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
-          SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-          std::this_thread::sleep_for(std::chrono::milliseconds(10));
-          SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
-          SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+std::thread threads::mems_tx(Context &ctx) {
+  return std::thread([&]() {
+    auto &pos_in = ctx.mems_pos;
+    auto &device = *global::mems;
+    // FCMP Field Buffer
+    static fcmp_field_cfg fcmp_config = {0};
+    // First reset the device
+    SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+    // SET_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
+    SET_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
+    SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
+    // Setup MEMS driver
+    SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+    // Wait for a while before pushing position
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+    SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Infinite loop until closed
+    try {
+      while (!global::flag_term) {
+        // Get next target position
+        auto pos = pos_in.read();
+        // Compute voltages
+        compute_channels(pos.x, pos.field.ch[0], pos.field.ch[1]);
+        compute_channels(pos.y, pos.field.ch[2], pos.field.ch[3]);
+        // Send position until ACK
+        bool flag_next = false;
+        while (!flag_next && !global::flag_term) {
+          std::cerr << LOG_NAME " Sending position (" << pos.x << ", " << pos.y
+                    << ")" << std::endl;
+          // Send frame
+          SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
+          // Check for ACK
+          std::unique_lock<std::mutex> lock(self.mutex);
+          while (self.ack == 0 && self.rej == 0 && !global::flag_term) {
+            self.updated.wait_for(lock, std::chrono::milliseconds(100));
+          }
+          flag_next = self.ack && !self.rej;
+          self.ack = self.rej = 0;
+          lock.unlock();
+          if (!flag_next) {
+            CLR_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+            SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+            SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          }
         }
       }
+    } catch (Threading::END &) {
+      // Normal termination
+    } catch (std::runtime_error &e) {
+      std::cerr << LOG_NAME " " << e.what() << std::endl;
+    } catch (...) {
+      std::cerr << LOG_NAME " Unknown exception" << std::endl;
     }
-  } catch (Threading::END &) {
-    // Normal termination
-  } catch (std::runtime_error &e) {
-    std::cerr << LOG_NAME " " << e.what() << std::endl;
-  } catch (...) {
-    std::cerr << LOG_NAME " Unknown exception" << std::endl;
-  }
-  // Make sure COBS is flushed
-  serial.write((uint8_t *)"\0\0\0\0", 4);
-  CLR_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
-  CLR_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
-  CLR_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
-  // Disable mems driver
-  SEND_TO_MEMS(serial, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-  // Close both pipes
-  pos_in.close();
-  pos_out.close();
-  // Wait for recv thread to terminate
-  std::cerr << LOG_NAME " waiting for recv thread." << std::endl;
-  recv.join();
-  std::cerr << LOG_NAME " terminated." << std::endl;
+    // Make sure COBS is flushed
+    device.write((uint8_t *)"\0\0\0\0", 4);
+    CLR_BIT(fcmp_config, FCMP_CFG_BIT_LOG);
+    CLR_BIT(fcmp_config, FCMP_CFG_BIT_MEMS_EN);
+    CLR_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
+    // Disable mems driver
+    SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+    // Close all pipes
+    ctx.close();
+    std::cerr << LOG_NAME " terminated." << std::endl;
+  });
 }
 
-} // namespace thread
-
 #undef LOG_NAME
-#define LOG_NAME "[thread::mems::recv]"
+#define LOG_NAME "[threads::mems::rx]"
 
 void serial_read(USB::SerialDevice &device) {
   serial_rx.size = device.read((uint8_t *)serial_rx.buf, sizeof(serial_rx.buf),
@@ -158,7 +147,7 @@ void serial_read(USB::SerialDevice &device) {
 }
 
 void serial_flush(USB::SerialDevice &device) {
-  while (true) {
+  while (!global::flag_term) {
     for (unsigned i = 0; i < serial_rx.size; i++) {
       if (serial_rx.buf[i] == 0) {
         move_ahead(serial_rx.buf, &serial_rx.size, i);
@@ -172,103 +161,109 @@ void serial_flush(USB::SerialDevice &device) {
   }
 }
 
-void recv_thread(USB::SerialDevice &device,
-                 Threading::FastIO<mems::Position> &pos_out) {
-  try {
-    std::shared_ptr<mems::SyncWindow> current_sync =
-        std::make_shared<mems::SyncWindow>();
-    mems::sync.write(current_sync);
-    mems::Position next_pos(0, 0, 0);
-    while (!thread::flag_exit) {
-      serial_read(device);
-      // Decode COBS
-      int ret;
-      while ((ret = cobs_decode(&cobs_rx, serial_rx.buf, serial_rx.size)) > 0) {
-        if (thread::flag_exit)
-          break;
-        // Save the remaining bytes
-        move_ahead(serial_rx.buf, &serial_rx.size, ret);
-        // Save payload size and reset cobs_rx
-        const size_t frame_size = cobs_rx.length;
-        cobs_reset(&cobs_rx);
-        // Process the FCMP frame
-        uint8_t checksum = fcmp_checksum(cobs_rx.data, frame_size);
-        if (checksum != 0) {
-          std::cerr << LOG_NAME " FCMP Checksum Error: " << (unsigned)checksum
-                    << std::endl;
-          continue;
-        }
-        // Get the payload size
-        if (frame_size < sizeof(fcmp_frame_t)) {
-          std::cerr << LOG_NAME " FCMP Frame Size Too Small (" << frame_size
-                    << " Bytes)" << std::endl;
-          continue;
-        };
-        // Process received frame
-        const size_t payload_size = frame_size - sizeof(fcmp_frame_t);
-        const fcmp_frame_t *frame = (const fcmp_frame_t *)cobs_rx.data;
-        const uint8_t method = frame->header & FCMP_METHOD,
-                      field = frame->header & FCMP_FIELD;
-        if (field == FCMP_FIELD_POS) {
-          if (method == FCMP_METHOD_ACK) {
-            // Check payload size
-            if (payload_size != sizeof(fcmp_field_pos)) {
-              std::cerr << LOG_NAME " FCMP Position Payload Size Mismatch (Got "
-                        << (unsigned)payload_size << " Bytes, Expecting "
-                        << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
-              continue;
-            }
-            // Update synchronization window
-            current_sync = current_sync->conclude(next_pos);
-            // Handle ACK:POS
-            const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
-            next_pos = mems::Position(
-                ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
-                ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]));
-            mems::sync.write(current_sync);
-            // std::cerr << LOG_NAME " ACK:POS " << Time::us() << std::endl;
-            { // Update acknowledge count
-              std::lock_guard<std::mutex> lock(self.mutex);
-              self.ack++;
-              self.updated.notify_all();
-            }
-          } else if (method == FCMP_METHOD_REJ) {
-            { // Update rejection count
-              std::lock_guard<std::mutex> lock(self.mutex);
-              self.rej++;
-              self.updated.notify_all();
-            }
-            std::string message((const char *)frame->field, payload_size);
-            std::cerr << LOG_NAME " FCMP Position Request Rejected (" << message
-                      << ")" << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+std::thread threads::mems_rx(Context &ctx) {
+  return std::thread([&]() {
+    auto &sync_out = ctx.mems_sync;
+    auto &device = *global::mems;
+    try {
+      std::shared_ptr<mems::SyncWindow> current_sync =
+          std::make_shared<mems::SyncWindow>();
+      sync_out.write(current_sync);
+      mems::Position next_pos(0, 0, 0);
+      while (!global::flag_term) {
+        serial_read(device);
+        // Decode COBS
+        int ret;
+        while ((ret = cobs_decode(&cobs_rx, serial_rx.buf, serial_rx.size)) >
+               0) {
+          if (global::flag_term)
+            break;
+          // Save the remaining bytes
+          move_ahead(serial_rx.buf, &serial_rx.size, ret);
+          // Save payload size and reset cobs_rx
+          const size_t frame_size = cobs_rx.length;
+          cobs_reset(&cobs_rx);
+          // Process the FCMP frame
+          uint8_t checksum = fcmp_checksum(cobs_rx.data, frame_size);
+          if (checksum != 0) {
+            std::cerr << LOG_NAME " FCMP Checksum Error: " << (unsigned)checksum
+                      << std::endl;
             continue;
-            // fcmp_log_frame(method, field, frame->field, payload_size);
           }
-        } else if (field == FCMP_FIELD_ANY) {
-          std::string type = "(?)";
-          if (method == FCMP_METHOD_LOG)
-            type = "LOG";
-          else if (method == FCMP_METHOD_REJ)
-            type = "REJ";
-          fprintf(stderr, LOG_NAME " FCMP %s:ANY (%lu) %.*s\n", type.c_str(),
-                  payload_size, (int)payload_size, frame->field);
+          // Get the payload size
+          if (frame_size < sizeof(fcmp_frame_t)) {
+            std::cerr << LOG_NAME " FCMP Frame Size Too Small (" << frame_size
+                      << " Bytes)" << std::endl;
+            continue;
+          };
+          // Process received frame
+          const size_t payload_size = frame_size - sizeof(fcmp_frame_t);
+          const fcmp_frame_t *frame = (const fcmp_frame_t *)cobs_rx.data;
+          const uint8_t method = frame->header & FCMP_METHOD,
+                        field = frame->header & FCMP_FIELD;
+          if (field == FCMP_FIELD_POS) {
+            if (method == FCMP_METHOD_ACK) {
+              // Check payload size
+              if (payload_size != sizeof(fcmp_field_pos)) {
+                std::cerr << LOG_NAME
+                    " FCMP Position Payload Size Mismatch (Got "
+                          << (unsigned)payload_size << " Bytes, Expecting "
+                          << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
+                continue;
+              }
+              // Update synchronization window
+              current_sync = current_sync->conclude(next_pos);
+              // Handle ACK:POS
+              const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
+              next_pos = mems::Position(
+                  ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
+                  ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]));
+              sync_out.write(current_sync);
+              // std::cerr << LOG_NAME " ACK:POS " << Time::us() << std::endl;
+              { // Update acknowledge count
+                std::lock_guard<std::mutex> lock(self.mutex);
+                self.ack++;
+                self.updated.notify_all();
+              }
+            } else if (method == FCMP_METHOD_REJ) {
+              { // Update rejection count
+                std::lock_guard<std::mutex> lock(self.mutex);
+                self.rej++;
+                self.updated.notify_all();
+              }
+              std::string message((const char *)frame->field, payload_size);
+              std::cerr << LOG_NAME " FCMP Position Request Rejected ("
+                        << message << ")" << std::endl;
+              std::this_thread::sleep_for(std::chrono::milliseconds(10));
+              continue;
+              // fcmp_log_frame(method, field, frame->field, payload_size);
+            }
+          } else if (field == FCMP_FIELD_ANY) {
+            std::string type = "(?)";
+            if (method == FCMP_METHOD_LOG)
+              type = "LOG";
+            else if (method == FCMP_METHOD_REJ)
+              type = "REJ";
+            fprintf(stderr, LOG_NAME " FCMP %s:ANY (%lu) %.*s\n", type.c_str(),
+                    payload_size, (int)payload_size, frame->field);
+          }
+        }
+        if (ret == 0) {
+          // No complete frame, serial buffer all consumed
+          serial_rx.size = 0;
+        } else { // ret < 0
+          std::cerr << LOG_NAME " COBS Error: " << ret << std::endl;
+          serial_flush(device);
         }
       }
-      if (ret == 0) {
-        // No complete frame, serial buffer all consumed
-        serial_rx.size = 0;
-      } else { // ret < 0
-        std::cerr << LOG_NAME " COBS Error: " << ret << std::endl;
-        serial_flush(device);
-      }
+    } catch (Threading::END &) {
+      // Normal termination
+    } catch (std::runtime_error &e) {
+      std::cerr << LOG_NAME " " << e.what() << std::endl;
+    } catch (...) {
+      std::cerr << LOG_NAME " Unknown exception" << std::endl;
     }
-  } catch (Threading::END &) {
-    // Normal termination
-  } catch (std::runtime_error &e) {
-    std::cerr << LOG_NAME " " << e.what() << std::endl;
-  } catch (...) {
-    std::cerr << LOG_NAME " Unknown exception" << std::endl;
-  }
-  std::cerr << LOG_NAME " terminated." << std::endl;
+    ctx.close();
+    std::cerr << LOG_NAME " terminated." << std::endl;
+  });
 }

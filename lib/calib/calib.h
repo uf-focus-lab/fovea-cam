@@ -1,7 +1,20 @@
 #pragma once
 
+#include <opencv2/core/types.hpp>
 #include <opencv2/opencv.hpp>
 
 namespace calib {
-cv::Rect roi(const double Vx, const double Vy, const int W, const int H);
-}
+
+typedef struct {
+  struct {
+    double x, y, xy, c;
+  } X, Y;
+} Coeff;
+
+extern Coeff V, P;
+
+cv::Point2d cvt(Coeff C, double x, double y);
+
+// Center x, y are scoped to [-1, 1]
+cv::Rect roi(const cv::Point2d center, const cv::Size size, double zoom);
+} // namespace calib

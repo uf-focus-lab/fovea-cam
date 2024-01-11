@@ -2,15 +2,15 @@
 #include <stdint.h>
 #include <string>
 #include <sys/types.h>
+#include <vector>
+
+#include "X11.h"
+#include "graphics/shared.h"
+#include "tile.h"
 
 #pragma once
 
 namespace graphics {
-
-typedef struct {
-  unsigned int w;
-  unsigned int h;
-} Shape;
 
 typedef enum {
   NONE = 0b000,
@@ -27,14 +27,18 @@ typedef enum {
 
 class Canvas {
 private:
-  cv::Mat mat;
+  cv::Mat mat, cursor_up, cursor_down;
+  int cursor_size = 0;
   int transform = transform::NONE;
+  void cursor_init(int size);
   void constructor(std::string fb_path, int transform);
   unsigned int width, height;
 
 public:
-  Canvas(unsigned, unsigned);
-  Canvas(unsigned, unsigned, unsigned);
+  Canvas(cv::Size size);
+  Canvas(cv::Size size, unsigned line_length);
+  Canvas(unsigned width, unsigned height);
+  Canvas(unsigned width, unsigned height, unsigned line_length);
   int get_transform();
   int set_transform(int);
   // Create a fork of framebuffer in new process
@@ -42,7 +46,7 @@ public:
   // Get the framebuffer
   cv::Mat Mat();
   // Shape of the canvas (after transformation)
-  Shape shape();
+  cv::Size shape();
   // Set the color for entire buffer
   Canvas &clear();
   Canvas &clear(uint8_t);
@@ -53,11 +57,15 @@ public:
   Canvas &show(const cv::Mat &, int transform = transform::NONE);
   // Specify a region on display to project to
   Canvas &show(const cv::Mat &, cv::Rect, int transform = transform::NONE);
+  // Shortcut to show tile(s)
+  Canvas &show(Tile &, int transform = transform::NONE);
+  Canvas &show(std::vector<Tile *> &, int transform = transform::NONE);
   // Render to internal buffer without any transformation
   Canvas &render(const cv::Mat &, cv::Point pos = {0, 0},
                  int transform = transform::NONE);
   // Apply internal buffer to framebuffer
-  Canvas &apply(void *);
+  Canvas &apply(void *, const PointerEvent *event = nullptr);
+  Canvas &apply(X11FB &fb, const PointerEvent *event = nullptr);
 };
 
 } // namespace graphics

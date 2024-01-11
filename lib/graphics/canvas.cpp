@@ -1,56 +1,110 @@
 #include "canvas.h"
+#include "alpha.h"
+#include "graphics/X11.h"
+#include "shared.h"
 
 #include <cstring>
+#include <iostream>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <unistd.h>
-
-namespace graphics {
 
 cv::Mat transform_mat(const cv::Mat &src, const int &transform) {
   cv::Mat mat(src);
   // Use pre-defined rotations
-  if (transform == transform::ROTATE_90) {
+  if (transform == graphics::transform::ROTATE_90) {
     cv::rotate(src, mat, cv::RotateFlags::ROTATE_90_CLOCKWISE);
-  } else if (transform == transform::ROTATE_180) {
+  } else if (transform == graphics::transform::ROTATE_180) {
     cv::rotate(src, mat, cv::RotateFlags::ROTATE_180);
-  } else if (transform == transform::ROTATE_270) {
+  } else if (transform == graphics::transform::ROTATE_270) {
     cv::rotate(src, mat, cv::RotateFlags::ROTATE_90_COUNTERCLOCKWISE);
   } else {
-    if (transform & transform::TRANSPOSE) {
+    if (transform & graphics::transform::TRANSPOSE) {
       cv::transpose(src, mat);
     }
-    const auto flip = transform & FLIP_XY;
-    if (flip == transform::FLIP_XY)
+    const auto flip = transform & graphics::transform::FLIP_XY;
+    if (flip == graphics::transform::FLIP_XY)
       cv::flip(src, mat, -1);
-    else if (flip & transform::FLIP_X)
+    else if (flip & graphics::transform::FLIP_X)
       cv::flip(src, mat, 0);
-    else if (flip & transform::FLIP_Y)
+    else if (flip & graphics::transform::FLIP_Y)
       cv::flip(src, mat, 1);
   }
   return mat;
 }
 
-cv::Point transform_point(cv::Point p, Shape s, const int &transform) {
-  if (transform & transform::TRANSPOSE) {
+cv::Point transform_point(cv::Point p, cv::Size s, const int &transform) {
+  if (transform & graphics::transform::TRANSPOSE) {
     p = {p.y, p.x};
-    s = {s.h, s.w};
+    s = {s.height, s.width};
   }
-  if (transform & transform::FLIP_X)
-    p.x = s.w - p.x - 1;
-  if (transform & transform::FLIP_Y)
-    p.y = s.h - p.y - 1;
+  if (transform & graphics::transform::FLIP_X)
+    p.x = s.width - p.x - 1;
+  if (transform & graphics::transform::FLIP_Y)
+    p.y = s.height - p.y - 1;
   return p;
+}
+
+void merge_channels(cv::Mat &a, cv::Mat &b) {
+  std::vector<cv::Mat> channels_a, channels_b;
+  cv::split(a, channels_a);
+  cv::split(b, channels_b);
+  for (auto ch : channels_b) {
+    channels_a.push_back(ch);
+  }
+  std::cout << channels_a.size() << std::endl;
+  cv::merge(channels_a, a);
+}
+
+namespace graphics {
+
+void Canvas::cursor_init(int size) {
+  cursor_size = size;
+  size *= 8;
+  const cv::Size s(size, size);
+  cursor_up = cv::Mat(s, CV_8UC4, color::black(0));
+  cursor_down = cv::Mat(s, CV_8UC4, color::black(0));
+  const int t = size / 16, r = size / 2 - t;
+  const cv::Point c(size / 2, size / 2);
+  // Draw hiDPI circle and then scale down
+  cv::circle(cursor_up, c, t, color::white(128), cv::FILLED);
+  cv::circle(cursor_up, c, t + t / 2, color::gray(128), t);
+  cv::circle(cursor_up, c, t + t, color::black(128), t);
+  cv::circle(cursor_down, c, r, color::black(64), cv::FILLED);
+  cv::circle(cursor_down, c, t, color::white(128), cv::FILLED);
+  cv::circle(cursor_down, c, r, color::black(64), t);
+  cv::circle(cursor_down, c, r - t / 2, color::white(64), t);
+  // Scale down
+  const auto s_target = cv::Size(cursor_size, cursor_size);
+  cv::resize(cursor_up, cursor_up, s_target, 0, 0, cv::INTER_AREA);
+  cv::resize(cursor_down, cursor_down, s_target, 0, 0, cv::INTER_AREA);
+}
+
+Canvas::Canvas(cv::Size size) : mat(size.height, size.width, CV_8UC4) {
+  this->width = size.width;
+  this->height = size.height;
+  cursor_init(std::min(width, height) / 8);
+}
+
+Canvas::Canvas(cv::Size size, unsigned line_length)
+    : mat(size.height, line_length, CV_8UC4) {
+  this->width = size.width;
+  this->height = size.height;
+  cursor_init(std::min(width, height) / 8);
 }
 
 Canvas::Canvas(unsigned width, unsigned height) : mat(height, width, CV_8UC4) {
   this->width = width;
   this->height = height;
+  cursor_init(std::min(width, height) / 8);
 }
 
 Canvas::Canvas(unsigned width, unsigned height, unsigned line_length)
     : mat(height, line_length, CV_8UC4) {
   this->width = width;
   this->height = height;
+  cursor_init(std::min(width, height) / 8);
 }
 
 int Canvas::get_transform() { return transform; };
@@ -64,11 +118,11 @@ int Canvas::set_transform(int transform) {
 
 cv::Mat Canvas::Mat() { return mat; };
 
-Shape Canvas::shape() {
+cv::Size Canvas::shape() {
   if (transform & transform::TRANSPOSE) {
-    return {.w = height, .h = width};
+    return {static_cast<int>(height), static_cast<int>(width)};
   } else {
-    return {.w = width, .h = height};
+    return {static_cast<int>(width), static_cast<int>(height)};
   }
 }
 
@@ -94,9 +148,7 @@ Canvas &Canvas::show() {
 }
 
 Canvas &Canvas::show(const cv::Mat &src, int transform) {
-  show(src,
-       cv::Rect{0, 0, static_cast<int>(shape().w), static_cast<int>(shape().h)},
-       transform);
+  show(src, cv::Rect{0, 0, shape().width, shape().height}, transform);
   return *this;
 }
 
@@ -117,15 +169,26 @@ Canvas &Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
   return *this;
 }
 
+Canvas &Canvas::show(Tile &tile, int transform) {
+  render(tile.raster(), {tile.bbox.x, tile.bbox.y}, transform);
+  return *this;
+}
+
+Canvas &Canvas::show(std::vector<Tile *> &tiles, int transform) {
+  for (auto tile : tiles) {
+    if (tile->updated)
+      show(*tile, transform);
+  }
+  return *this;
+}
+
 Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   // Apply transform
   const auto tile_transform = transform ^ this->transform;
   auto dst = transform_mat(src, tile_transform);
   auto corner_pos = transform_point(pos, shape(), tile_transform),
-       corner_off = transform_point({0, 0},
-                                    {static_cast<unsigned int>(src.cols),
-                                     static_cast<unsigned int>(src.rows)},
-                                    tile_transform);
+       corner_off =
+           transform_point({0, 0}, {src.cols, src.rows}, tile_transform);
   pos = corner_pos - corner_off;
   // Check if trim is necessary
   cv::Rect trim = {0, 0, dst.cols, dst.rows};
@@ -141,9 +204,29 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
   return *this;
 }
 
-Canvas &Canvas::apply(void *fb) {
-  const auto s = mat.size();
-  memcpy(fb, mat.data, s.height * s.width * 4);
+Canvas &Canvas::apply(void *fb, const PointerEvent *event) {
+  cv::Mat disp;
+  if (event != nullptr && event->valid) {
+    const cv::Rect dst(event->x, event->y, cursor_size, cursor_size);
+    const int bleed = cursor_size / 2;
+    cv::copyMakeBorder(mat, disp, bleed, bleed, bleed, bleed,
+                       cv::BORDER_CONSTANT, color::black(255));
+    auto cursor = disp(dst).clone();
+    auto c = cv::Mat(dst.size(), CV_8UC4, color::red(128));
+    alpha_blend(cursor, event->is_down(1) ? cursor_down : cursor_up);
+    cursor.copyTo(disp(dst));
+    disp = disp(cv::Rect(bleed, bleed, width, height)).clone();
+  } else {
+    disp = mat;
+  }
+  const auto s = disp.size();
+  memcpy(fb, disp.data, s.height * s.width * 4);
+  return *this;
+}
+
+Canvas &Canvas::apply(X11FB &fb, const PointerEvent *event) {
+  apply(fb.buffer(), event);
+  fb.sync();
   return *this;
 }
 

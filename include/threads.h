@@ -1,41 +1,17 @@
 #pragma once
 
-#include "context.h"
+#include "global.h"
 
-#include "mems/mems.h"
-#include "threading/fast_io.h"
-#include "threading/fifo.h"
-#include "usb/serial_device.h"
-#include "util/spinnaker.h"
+using namespace Spinnaker;
 
-namespace thread {
+namespace threads {
 
-extern bool flag_exit;
+std::thread mems_tx(Context &);
 
-void capture(Spinnaker::CameraPtr &camera,
-             Threading::FastIO<cv::Mat> &pipe_out);
+std::thread mems_rx(Context &);
 
-void capture(Spinnaker::CameraPtr &camera,
-             std::vector<Threading::FastIO<cv::Mat> *> pipes_out,
-             Threading::FastIO<mems::Position> &pos_real);
+std::thread capture_wide(Context &);
 
-void stack(Threading::FastIO<cv::Mat> &pipe_in,
-           Threading::FastIO<cv::Mat> &pipe_out, const size_t n);
+std::thread capture_fovea(Context &);
 
-void display(Threading::FastIO<cv::Mat> &pipe_tile_a,
-             std::vector<Threading::FastIO<cv::Mat> *> pipe_tile_b);
-
-void mems(USB::SerialDevice &device, Threading::FIFO<mems::Position> &pos_in,
-          Threading::FastIO<mems::Position> &pos_out);
-
-void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out,
-           bool transform = false);
-
-void track_pid(
-    Threading::FastIO<std::vector<context::ArUcoInfo>> &wide_info_in,
-    Threading::FastIO<std::vector<context::ArUcoInfo>> &fovea_info_in,
-    Threading::FIFO<mems::Position> &mems_pos_next,
-    Threading::FastIO<mems::Position> &mems_pos_back);
-
-} // namespace thread
+} // namespace threads

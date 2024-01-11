@@ -35,6 +35,9 @@ init:
 	sudo systemctl enable Xorg.service
 	sudo systemctl restart Xorg.service
 
+start: release
+	sudo build/FoveaCam
+
 include $(wildcard scripts/*.mk)
 
 .PHONY: release debug init clean

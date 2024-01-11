@@ -1,31 +1,72 @@
 #include "calib.h"
+#include "util/clamp.h"
+
+/*
+
+Fitting from pixel offset to voltage
+====================================
+
+Vx(Px, Py) = 1.65351813 * Px
+           + 0.02880365 * Py
+           + -0.01224670 * Px * Py
+           + -0.26734991
+
+          // {1.65351813, 0.02880365, -0.01224670, -0.26734991}
+
+Vy(Px, Py) = -0.21179073 * Px
+           + 1.62766630 * Py
+           + 0.26033701 * Px * Py
+           + -0.38046607
+
+          // {-0.21179073, 1.62766630, 0.26033701, -0.38046607}
+
+Fitting from voltage to pixel offset
+====================================
+
+Px(Vx, Vy) = 0.60499259 * Vx
+           + -0.00989779 * Vy
+           + 0.00366316 * Vx * Vy
+           + 0.15776422 * 1
+
+          // {0.60499259, -0.00989779, 0.00366316, 0.15776422}
+
+Py(Vx, Vy) = 0.04906417 * Vx
+           + 0.59860207 * Vy
+           + -0.05216969 * Vx * Vy
+           + 0.24852338 * 1
+
+          // {0.04906417, 0.59860207, -0.05216969, 0.24852338}
+
+*/
+
+using namespace calib;
 
 // Preloaded calibration coefficients
-static const struct {
-  double x, y, xy, c;
-} Cx = {4.85459339325059, -0.06452967035358549, 0.00016280733222939038,
-        -63.032525040658314},
-  Cy = {-0.13787596565316557, -3.435103383528066, 0.0017389896032312644,
-        -64.05920615697792};
+Coeff calib::V = {.X = {1.65351813, 0.02880365, -0.01224670, -0.26734991},
+                  .Y = {-0.21179073, 1.62766630, 0.26033701, -0.38046607}},
+      calib::P = {.X = {0.60499259, -0.00989779, 0.00366316, 0.15776422},
+                  .Y = {0.04906417, 0.59860207, -0.05216969, 0.24852338}};
 
-static inline double clamp(double val, double min, double max) {
-  if (val < min)
-    return min;
-  if (val > max)
-    return max;
-  return val;
+cv::Point2d calib::cvt(Coeff C, double x, double y) {
+  return {
+      (x - C.X.c) / (C.X.x + C.X.xy * y),
+      (y - C.Y.c) / (C.Y.y + C.Y.xy * x),
+  };
 }
 
-static const double SCALE = 4.65;
+// [0, 1] -> [0, k * (1 - z)]
+int project(double r, double z, int k) {
+  const double max = 1.0 - z;
+  return static_cast<int>(clamp(r - 0.5 * z, 0.0, max) *
+                          static_cast<double>(k));
+}
 
-namespace calib {
-cv::Rect roi(const double Vx, const double Vy, const int W, const int H) {
-  const double Px = Cx.x * Vx + Cx.y * Vy + Cx.xy * Vx * Vy + Cx.c,
-               Py = Cy.x * Vx + Cy.y * Vy + Cy.xy * Vx * Vy + Cy.c;
-  const int x = (1.0 - 1.0 / Cx.x) * (double)(W) / 2.0 + Px,
-            y = (1.0 + 1.0 / Cy.y) * (double)(H) / 2.0 + Py,
-            w = (double)(W) / SCALE, h = (double)(H) / SCALE;
+cv::Rect calib::roi(const cv::Point2d C, const cv::Size S, double z) {
+  if (z >= 1.0)
+    z = 1.0 / z;
+  const int W = S.width, H = S.height;
+  const int x = project(C.x, z, W), y = project(C.y, z, H);
+  int w = static_cast<int>(static_cast<double>(W) * z),
+      h = static_cast<int>(static_cast<double>(H) * z);
   return cv::Rect(clamp(x, 0, W - w), clamp(y, 0, H - h), w, h);
 }
-
-} // namespace calib

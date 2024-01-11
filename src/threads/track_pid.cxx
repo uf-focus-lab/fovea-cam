@@ -1,11 +1,13 @@
 #include "context.h"
 #include "threads.h"
 
-#include "graphics/canvas.h"
 #include "util/assert.h"
 
 #include <iostream>
 #include <sstream>
+
+#undef LOGNAME
+#define LOGNAME "[threads::track_pid]"
 
 // If the center of the marker is within this distance from the center of the
 // image, no correction will be performed.
@@ -18,27 +20,19 @@ void normalize(double &volt, double max = max_output) {
     volt = -max;
 }
 
-namespace thread {
-
-#undef LOGNAME
-#define LOGNAME "[thread::track_pid]"
-
-void track_pid(
-    Threading::FastIO<std::vector<context::ArUcoInfo>> &wide_info_in,
-    Threading::FastIO<std::vector<context::ArUcoInfo>> &fovea_info_in,
-    Threading::FIFO<mems::Position> &mems_pos_next,
-    Threading::FastIO<mems::Position> &mems_pos_back) {
+void track_pid(ArUcoPipe &wide_info_in, ArUcoPipe &fovea_info_in,
+               PosPipe &mems_pos_in, PosFIFO &mems_pos_out) {
   try {
-    mems_pos_next.write({0.0, 0.0});
-    mems_pos_next.write({0.0, 0.0});
+    mems_pos_out.write({0.0, 0.0});
+    mems_pos_out.write({0.0, 0.0});
     int prev_id = 0;
-    std::shared_ptr<const std::vector<context::ArUcoInfo>> prev_info_fovea =
+    std::shared_ptr<const std::vector<global::ArUcoInfo>> prev_info_fovea =
         nullptr;
-    while (!flag_exit) {
+    while (!global::flag_term) {
       // Read next frame from pipe
       auto info_wide = wide_info_in.read(), info_fovea = fovea_info_in.read();
       // Get latest position from mems
-      auto current_pos = mems_pos_back.read();
+      auto current_pos = mems_pos_in.read();
       // Check if position is available
       if (current_pos == nullptr || info_wide == nullptr ||
           info_fovea == nullptr)
@@ -67,7 +61,7 @@ void track_pid(
       normalize(mems_x);
       normalize(mems_y);
       // Send to mems
-      mems_pos_next.write({mems_x, mems_y});
+      mems_pos_out.write({mems_x, mems_y});
       // Check if the marker is the same
       if (prev_id == 0 && fovea.id > 0 && fovea.id == wide.id) {
         std::stringstream ss;
@@ -91,9 +85,14 @@ void track_pid(
   }
   wide_info_in.close();
   fovea_info_in.close();
-  mems_pos_next.close();
-  mems_pos_back.close();
+  mems_pos_out.close();
+  mems_pos_in.close();
   std::cerr << LOGNAME " terminated." << std::endl;
 }
 
-} // namespace thread
+std::thread threads::track_pid(ArUcoPipe &wide_info_in, ArUcoPipe &fovea_info_in,
+                              PosPipe &mems_pos_in, PosFIFO &mems_pos_out) {
+  return std::thread([&]() {
+    track_pid(wide_info_in, fovea_info_in, mems_pos_in, mems_pos_out);
+  })
+}

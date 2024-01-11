@@ -1,10 +1,9 @@
 #pragma once
 #include "exception.h"
 
-#include <condition_variable>
+#include <condition_variable> // IWYU pragma: export
 #include <memory>
 #include <mutex>
-#include <thread>
 
 namespace Threading {
 

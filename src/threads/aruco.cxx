@@ -8,19 +8,19 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-namespace thread {
+namespace threads {
 
 #undef LOGNAME
-#define LOGNAME "[thread::aruco]"
+#define LOGNAME "[threads::aruco]"
 
 unsigned counter = 0;
 
-void aruco(Threading::FastIO<cv::Mat> &pipe_mat_in,
-           Threading::FastIO<std::vector<context::ArUcoInfo>> &pipe_info_out,
+void aruco(MatPipe &pipe_mat_in,
+           ArUcoPipe &pipe_info_out,
            bool transform) {
   try {
     std::shared_ptr<const cv::Mat> prev_ptr = nullptr;
-    while (!flag_exit) {
+    while (!global::flag_term) {
       // Read next frame from pipe
       auto next_ptr = pipe_mat_in.read();
       if (next_ptr == nullptr)

@@ -1,13 +1,6 @@
-#include "canvas.h"
+#include "shared.h"
 
 #pragma once
-
-typedef struct {
-  bool valid;
-  int x;
-  int y;
-  unsigned int button;
-} PointerEvent;
 
 namespace graphics {
 
@@ -20,14 +13,13 @@ private:
 public:
   X11FB();
   ~X11FB();
-  Shape shape();
+  cv::Size shape();
   unsigned char *buffer();
   void sync();
   void flush();
   void use(void *buffer);
-  bool isOpen();
+  bool is_open();
   PointerEvent wait_pointer(bool block = true);
-  int events_pending();
 };
 
 } // namespace graphics

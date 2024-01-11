@@ -12,4 +12,5 @@
         "fcmp",
         "libusb"
     ],
+    "editor.detectIndentation": false,
 }

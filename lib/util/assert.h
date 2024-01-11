@@ -14,8 +14,10 @@ public:
       throw AssertionError(MESSAGE);                                           \
   }
 
-#define CATCH_ASSERT(STATEMENTS)                                               \
+#define CATCH_ASSERT(LOGNAME)                                                  \
   catch (AssertionError & e) {                                                 \
-    std::cerr << e.what() << std::endl;                                        \
-    { STATEMENTS }                                                             \
+    std::cerr << "[ASSERTION ERROR] " << e.what() << std::endl;                \
+  }                                                                            \
+  catch (...) {                                                                \
+    std::cerr << LOGNAME "Unknown Error" << std::endl;                         \
   }

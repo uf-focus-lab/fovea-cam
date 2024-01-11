@@ -8,13 +8,11 @@
 #ifdef interface
 #undef interface
 #endif
-#include <Spinnaker.h>
+#include <Spinnaker.h> // IWYU pragma: export
 #ifdef interface
 #undef interface
 #endif
 #include <opencv2/opencv.hpp>
-
-#include <string>
 
 namespace Spinnaker {
 
