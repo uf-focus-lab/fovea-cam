@@ -13,6 +13,8 @@ typedef struct {
 
 extern Coeff VtoP, PtoV;
 
+extern cv::Point2d shift;
+
 cv::Point2d cvt(Coeff C, double x, double y);
 
 // Center x, y are scoped to [-1, 1]
