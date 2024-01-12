@@ -92,21 +92,26 @@ void tasks::match(Context &ctx) {
   // Theme colors
   const cv::Scalar bg(16, 16, 16, 255);
   const cv::Scalar gr(96, 80, 64, 255);
+  const cv::Scalar red1(0, 0, 64, 255);
+  const cv::Scalar red2(0, 0, 128, 255);
   const cv::Scalar fg(104, 221, 237, 255);
   // Prepare tiles for interaction
   const int w = fb.shape().width, h = fb.shape().height;
   const int pad = w / 64;
   const int btn_h = w / 8, btn_w = w / 4;
-  const int img_h = (h - 2 * btn_h) / 2;
+  const int note_h = btn_h / 2;
+  const int img_h1 = std::min((h - btn_h) / 2, 2 * w / 5);
+  const int img_h2 = h - img_h1 - btn_h - note_h;
+  std::cerr << "img_h1: " << img_h1 << ", img_h2: " << img_h2 << std::endl;
   // Create tiles
   int y = 0;
-  Tile match_tile(cv::Rect{0, y, w / 2, img_h}, pad);
-  Tile fovea_tile(cv::Rect{w / 2, y, w / 2, img_h}, pad);
-  y += img_h;
-  Tile wide_tile(cv::Rect{0, y, w, img_h}, pad);
-  y += img_h;
-  Tile notes(cv::Rect{0, y, w, btn_h}, pad);
-  y += btn_h;
+  Tile match_tile(cv::Rect{0, y, w / 2, img_h1}, pad);
+  Tile fovea_tile(cv::Rect{w / 2, y, w / 2, img_h1}, pad);
+  y += img_h1;
+  Tile wide_tile(cv::Rect{0, y, w, img_h2}, pad);
+  y += img_h2;
+  Tile notes(cv::Rect{0, y, w, note_h});
+  y += note_h;
   Tile exit_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
   Tile reset_btn(cv::Rect{btn_w, y, btn_w, btn_h}, pad);
   Tile calib_btn(cv::Rect{btn_w * 2, y, btn_w * 2, btn_h}, pad);
@@ -115,9 +120,9 @@ void tasks::match(Context &ctx) {
       &fovea_tile.fill(bg),
       &wide_tile.fill(bg),
       &notes.text("current task: match", fg),
-      &exit_btn.fill(color::red(64)).text("EXIT", fg),
-      &reset_btn.fill(color::red(64)).text("RESET", fg),
-      &calib_btn.fill(color::red(64)).text("CALIBRATE", fg),
+      &exit_btn.fill(red1).text("EXIT", fg),
+      &reset_btn.fill(bg).text("RESET", fg),
+      &calib_btn.fill(bg).text("CALIBRATE", fg),
   };
   // Render loop
   try {
@@ -169,7 +174,7 @@ void tasks::match(Context &ctx) {
         notes.text(ss.str(), fg);
       }
 
-      if (exit_btn.button(pos, bg, gr))
+      if (exit_btn.button(pos, red1, red2))
         global::flag_term = true;
 
       if (reset_btn.button(pos, bg, gr))

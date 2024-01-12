@@ -37,16 +37,15 @@ int run_task(const std::string task) {
     tasks::match(ctx);
   else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
+    global::flag_term = true;
     ctx.close();
-    ctx.join();
-    global::deinit_devices();
-    std::exit(1);
   }
   std::cerr << "[main] Task " << task << " finished" << std::endl;
   // Wait for threads to terminate
   ctx.join();
   // Recover signal handlers
   global::deinit_signal();
+  std::cerr << "[main] Terminating" << std::endl;
   return 0;
 }
 

@@ -211,13 +211,13 @@ std::thread threads::mems_rx(Context &ctx) {
                           << sizeof(fcmp_field_pos) << " Bytes)" << std::endl;
                 continue;
               }
-              // Update synchronization window
-              current_sync = current_sync->conclude(next_pos);
               // Handle ACK:POS
               const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
               next_pos = mems::Position(
                   ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
                   ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]));
+              // Update synchronization window
+              current_sync = current_sync->conclude(next_pos);
               sync_out.write(current_sync);
               // std::cerr << LOG_NAME " ACK:POS " << Time::us() << std::endl;
               { // Update acknowledge count

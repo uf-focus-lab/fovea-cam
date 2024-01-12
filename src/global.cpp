@@ -49,8 +49,8 @@ void deinit_signal() {
 
 Config config = {
     .fps = 0.0,   // Frame per second, 0 means no limit
-    .exp = 16.66, // Exposure time in ms
-    .gain = 20.0, // Gain, only applies to fovea camera
+    .exp = 33.33, // Exposure time in ms
+    .gain = 30.0, // Gain, only applies to fovea camera
     .zoom = 4.65  // Zoom ratio
 };
 
