@@ -47,6 +47,8 @@ Coeff calib::PtoV = {.X = {1.65351813, 0.02880365, -0.01224670, -0.26734991},
       calib::VtoP = {.X = {0.60499259, -0.00989779, 0.00366316, 0.15776422},
                      .Y = {0.04906417, 0.59860207, -0.05216969, 0.24852338}};
 
+cv::Point2d calib::shift = {0, 0};
+
 cv::Point2d calib::cvt(Coeff C, double x, double y) {
   double xy = x * y;
   const auto &CX = C.X, &CY = C.Y;

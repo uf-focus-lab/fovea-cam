@@ -54,6 +54,31 @@ void matcher(Context &ctx, MatPipe &match_out,
 }
 
 #undef LOGNAME
+#define LOGNAME "[task:match:calibrator] "
+
+bool flag_calibrating = false;
+
+void calibrator(std::shared_ptr<cv::Mat> wide, std::shared_ptr<cv::Mat> fovea,
+                cv::Point2d initial_pos) {
+  std::thread([&]() {
+    const auto &zoom = global::config.zoom;
+    double scale = 1 / zoom;
+    // Step 1: Create local copy of monochrome wide and fovea
+    cv::Mat wide_mono, fovea_mono;
+    cv::cvtColor(*wide, wide_mono, cv::COLOR_RGBA2GRAY);
+    cv::cvtColor(*fovea, fovea_mono, cv::COLOR_RGBA2GRAY);
+    // Step 2: scale down the fovea to match dpi with wide
+    cv::resize(fovea_mono, fovea_mono, {}, scale, scale, cv::INTER_AREA);
+    // Step 3: Equalize histogram of both images
+    cv::equalizeHist(wide_mono, wide_mono);
+    cv::equalizeHist(fovea_mono, fovea_mono);
+    // Step 4: Find the best match
+
+    // Step 5: Calculate the offset
+  }).detach();
+}
+
+#undef LOGNAME
 #define LOGNAME "[task:match] "
 
 void tasks::match(Context &ctx) {

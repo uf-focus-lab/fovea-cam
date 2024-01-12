@@ -68,13 +68,13 @@ void Canvas::cursor_init(int size) {
   const int t = size / 16, r = size / 2 - t;
   const cv::Point c(size / 2, size / 2);
   // Draw hiDPI circle and then scale down
-  cv::circle(cursor_up, c, t, color::white(128), cv::FILLED);
-  cv::circle(cursor_up, c, t + t / 2, color::gray(128), t);
-  cv::circle(cursor_up, c, t + t, color::black(128), t);
+  cv::circle(cursor_up, c, t, color::white(192), cv::FILLED);
+  cv::circle(cursor_up, c, t + t / 2, color::gray(192), t);
+  cv::circle(cursor_up, c, 2 * t + t / 2, color::black(128), t);
   cv::circle(cursor_down, c, r, color::black(64), cv::FILLED);
-  cv::circle(cursor_down, c, t, color::white(128), cv::FILLED);
+  cv::circle(cursor_down, c, t, color::white(192), cv::FILLED);
   cv::circle(cursor_down, c, r, color::black(64), t);
-  cv::circle(cursor_down, c, r - t / 2, color::white(64), t);
+  cv::circle(cursor_down, c, r - t / 2, color::white(192), t);
   // Scale down
   const auto s_target = cv::Size(cursor_size, cursor_size);
   cv::resize(cursor_up, cursor_up, s_target, 0, 0, cv::INTER_AREA);
