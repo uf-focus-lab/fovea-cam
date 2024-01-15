@@ -22,7 +22,7 @@ std::thread GUI::mat_renderer(MatPipe &mat_pipe, graphics::Tile &tile,
         if (frame == nullptr)
           continue;
         if (roi_pipe == nullptr) {
-          tile.fill(roi_mat).raster();
+          tile.use(roi_mat).raster();
           continue;
         }
         if (roi_pipe->next(roi) || !flag_rect) {
@@ -31,7 +31,7 @@ std::thread GUI::mat_renderer(MatPipe &mat_pipe, graphics::Tile &tile,
           if (!flag_rect)
             roi_mat = frame->clone();
           cv::rectangle(roi_mat, *roi, color::red(), 4);
-          tile.fill(roi_mat).raster();
+          tile.use(roi_mat).raster();
           flag_rect = true;
         }
       }
@@ -59,7 +59,7 @@ std::thread GUI::fovea_renderer(FoveaPipe &fovea_pipe, graphics::Tile &tile,
         ASSERT(fovea != nullptr, LOGNAME "NOT EXPECTED: next() == nullptr");
         if (tag >= 0 && fovea->tag != tag)
           continue;
-        tile.fill(fovea->mat).raster();
+        tile.use(fovea->mat).raster();
       }
     }
     EXPECT_END_OF_STREAM

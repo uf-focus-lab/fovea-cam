@@ -20,7 +20,6 @@ const TileStyleSheet default_style = {
     .text =
         {
             .weight = 2.0,
-            .height = 0.5,
             .inset = 0.2,
             .color = color::mono(1),
         },

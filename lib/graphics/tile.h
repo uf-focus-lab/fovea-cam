@@ -26,8 +26,7 @@ typedef struct TileStyleSheet {
   TileStyle normal, active;
   struct {
     double weight;
-    double height; // max height relative to cbox height
-    double inset;  // relative to height
+    double inset; // relative to height
     cv::Scalar color;
   } text;
 } TileStyleSheet;
@@ -38,7 +37,6 @@ class Tile {
   friend class Canvas;
 
 private:
-  cv::Point img_offset = {0, 0};
   bool contains(PointerEvent pos);
   TileStyle &sty();
 
@@ -48,6 +46,16 @@ protected:
   cv::Rect cbox; // Content box (content boundary)
                  // used as the boundary of content rendering
                  // offset is relative to bounding box
+  // Mat rendering position and size
+  // fractional (relative to cbox)
+  cv::Rect2d m_loc = {0, 0, 1, 1};
+  // Text position and size
+  // fractional (relative to cbox)
+  cv::Rect2d t_loc = {0, 0.25, 1, 0.5};
+  // Absolute area in pixels, relative to canvas
+  // will take into consideration under filled gaps
+  cv::Rect absolute(const cv::Rect2d &);
+  cv::Rect absolute(const cv::Rect2d &, cv::Mat &);
   // Flag to indicate the need for re-rendering
   bool updated = false;
   // Flag to indicate if latest canvas has been read
@@ -82,13 +90,17 @@ public:
   bool raster();
   // Return a new tile with the same style and handler, but different bbox
   Tile &loc(cv::Rect bbox, int pad = 0);
+  Tile &mbox(cv::Rect2d mbox);
+  Tile &tbox(cv::Rect2d tbox);
   // Content rendering properties and methods
-  cv::Mat bg, fg;
+  cv::Mat bg; // Background, controlled by wipe() and fill()
+  cv::Mat mg; // Mid-ground, controlled by use(cv::Mat)
+  cv::Mat fg; // Foreground, controlled by text()
   Tile &wipe();
-  Tile &fill(cv::Mat img);
   Tile &fill(double x2 = 1.0, double y2 = 1.0);
   Tile &fill(double x1, double x2, double y1, double y2);
   Tile &text(std::string text);
+  Tile &use(cv::Mat img);
   // Interaction related properties and methods
   bool is_active();
   cv::Point2d val = {0, 0};

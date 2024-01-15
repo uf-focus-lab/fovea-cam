@@ -42,7 +42,7 @@ std::thread matcher(Context &ctx, Tile &tile,
         // Push to pipe
         try {
           roi_out.write(roi);
-          tile.fill((*wide)(roi)).raster();
+          tile.use((*wide)(roi)).raster();
         } catch (cv::Exception &e) {
           std::cerr << LOGNAME "out of bound roi: " << roi << std::endl;
         }
@@ -135,9 +135,8 @@ void tasks::match(Context &ctx) {
   Tile wide_tile(cv::Rect{0, y, w, img_h2}, pad);
   y += img_h2;
   Tile notes(cv::Rect{0, y, w, note_h});
-  notes.style.text.height = 0.6;
+  notes.tbox({0, .2, 1, .6});
   notes.style.bg = color::mono(0);
-  notes.wipe();
   y += note_h;
   auto back_btn = GUI::back_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
   Tile reset_btn(cv::Rect{btn_w, y, btn_w, btn_h}, pad);

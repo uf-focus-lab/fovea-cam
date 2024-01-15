@@ -34,7 +34,7 @@ int kiosk() {
   // Tile for splash image
   const cv::Mat splash_mat(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
                            (char *)SPLASH_PNG_DATA);
-  Tile splash({0, 0, w, y}, pad);
+  Tile splash({0, 0, w, y}, 2 * pad);
   splash.style.bg = color::mono(0);
 
   x = 0;
@@ -74,19 +74,19 @@ int kiosk() {
            .text("STABILIZE") //
            .use([&task](Tile &, bool) { task = "stabilize"; }),
   };
-  canvas.clear().show(splash.fill(splash_mat)).show(tiles).apply(fb);
+  canvas.clear().show(splash.use(splash_mat)).show(tiles).apply(fb);
 
   std::cerr << LOG_NAME "Start interaction" << std::endl;
   while (!global::flag_term) {
-    if (task != "") {
-      run_task(task);
-      task = "";
-    }
     const auto pos = fb.wait_pointer(true);
     // Check for corresponding tile
     for (auto tile : tiles)
       tile->handle(pos);
     canvas.show(tiles).apply(fb, &pos);
+    if (task != "") {
+      run_task(task);
+      task = "";
+    }
   }
   return 0;
 }
@@ -100,11 +100,11 @@ void splash() {
   const cv::Mat logo_mat(UF_LOGO_PNG_H, UF_LOGO_PNG_W, CV_8UC4,
                          (char *)UF_LOGO_PNG_DATA);
   const int logo_h = std::min(h / 8, w / 8), pad = w / 64;
-  Tile splash({0, 0, w, h - 3 * logo_h}, pad);
+  Tile splash({0, 0, w, h - 3 * logo_h}, 2 * pad);
   Tile logo({0, h - 2 * logo_h, w, logo_h}, 2 * pad);
   splash.style.bg = logo.style.bg = color::mono(0);
   canvas.clear()
-      .show(splash.fill(splash_mat))
-      .show(logo.fill(logo_mat))
+      .show(splash.use(splash_mat))
+      .show(logo.use(logo_mat))
       .apply(fb);
 }

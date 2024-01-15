@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sstream>
 #include <stdexcept>
 
 class AssertionError : public std::runtime_error {
@@ -10,8 +11,11 @@ public:
 
 #define ASSERT(COND, MESSAGE)                                                  \
   {                                                                            \
-    if (!(COND))                                                               \
-      throw AssertionError(MESSAGE);                                           \
+    if (!(COND)) {                                                             \
+      std::stringstream ss;                                                    \
+      ss << MESSAGE;                                                           \
+      AssertionError(ss.str());                                                \
+    }                                                                          \
   }
 
 #define CATCH_ASSERT(LOGNAME)                                                  \
