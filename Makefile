@@ -34,6 +34,9 @@ init:
 	sudo systemctl daemon-reload
 	sudo systemctl enable Xorg.service
 	sudo systemctl restart Xorg.service
+	sudo ln -sf $(PWD)/scripts/FoveaCam.service /etc/systemd/system/FoveaCam.service
+	sudo systemctl enable FoveaCam.service
+	sudo systemctl restart FoveaCam.service
 
 TASK ?=
 start: release

@@ -1,4 +1,3 @@
-#include <cmath>
 #include <glob.h>
 #include <iostream>
 #include <opencv2/core.hpp>
@@ -10,135 +9,102 @@
 
 #include "global.h"
 
-#include "graphics/canvas.h"
-#include "graphics/tile.h"
-#include "util/clamp.h"
+#include <graphics/canvas.h>
+#include <graphics/tile.h>
+#include <util/clamp.h>
 
 #include "splash.png.h"
+#include "uf.logo.png.h"
 
 #undef LOG_NAME
 #define LOG_NAME "[kiosk] "
 
 using namespace graphics;
 
-std::string str(std::string prefix, double val, int precision = 2) {
-  std::stringstream stream;
-  stream << prefix << std::fixed << std::setprecision(precision) << val;
-  return stream.str();
-}
-
-std::string str(double val, int precision = 2) {
-  std::stringstream stream;
-  stream << std::fixed << std::setprecision(precision) << val;
-  return stream.str();
-}
-
-std::string EXP(cv::Point2d val) {
-  auto &exp = global::config.exp;
-  exp = clamp<double>(val.x, 0, 1) * 100.0;
-  return "EXP = " + str(exp);
-}
-
-std::string FPS(cv::Point2d val) {
-  auto &fps = global::config.fps;
-  if (val.x > 0.1)
-    fps = clamp<double>(val.x, 0, 1) * 110 - 10.5;
-  else
-    fps = -1.0;
-  return "FPS = " + (fps > 0.0 ? str(fps) : "N/A");
-}
-
-std::string GAIN(cv::Point2d val) {
-  auto &gain = global::config.gain;
-  if (val.x > 0.05)
-    gain = clamp<double>(val.x, 0, 1) * 40.0;
-  else
-    gain = 0.0;
-  return "GAIN = " + str(gain);
-}
-
 int run_task(const std::string task);
 
-cv::Rect pad_rect(int x, int y, int w, int h, int pad) {
-  return cv::Rect(x + pad, y + pad, w - pad * 2, h - pad * 2);
-}
-
 int kiosk() {
-  std::cerr << LOG_NAME "Entering Kiosk mode" << std::endl;
+  std::cerr << LOG_NAME "Entering Kiosk Mode" << std::endl;
   auto &fb = *global::fb;
   Canvas canvas(fb.shape());
   // Prepare tiles for interaction
-  const int w = fb.shape().width, h = fb.shape().height / 2 / 4,
-            pad = rint(double(h) / 8.f);
-  const cv::Scalar bg(16, 16, 16, 255);
-  const cv::Scalar gr(96, 80, 64, 255);
-  const cv::Scalar fg(104, 221, 237, 255);
-  int y = fb.shape().height / 2;
+  const int w = fb.shape().width, pad = w / 64;
+  const int btn_h = w / 8, btn_w = w / 4;
+  int x, y = fb.shape().height - 3 * btn_h;
   // Tile for splash image
   const cv::Mat splash_mat(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
                            (char *)SPLASH_PNG_DATA);
   Tile splash({0, 0, w, y}, pad);
-  // Tile for FPS slider
-  Tile fps(cv::Rect{0, y, w, h}, pad);
-  // Tile for EXP slider
-  y += h;
-  Tile exp(cv::Rect{0, y, w, h}, pad);
-  exp.val.x = global::config.exp / 100.0;
-  // Tile for EXP slider
-  y += h;
-  Tile gain(cv::Rect{0, y, w, h}, pad);
-  gain.val.x = global::config.gain / 40.0;
-  // Tile for action buttons
-  y += h;
-  Tile btn_tune(cv::Rect{0, y, w / 4, h}, pad),
-      btn_track(cv::Rect{w / 4, y, w / 4, h}, pad),
-      btn_match(cv::Rect{2 * w / 4, y, w / 4, h}, pad),
-      btn_rec(cv::Rect{3 * w / 4, y, w / 4, h}, pad);
+  splash.style.bg = color::mono(0);
 
-  std::vector<Tile *> tiles = {
-      &splash.fill(splash_mat),
-      &fps.fill(bg).fill(gr, fps.val.x).text(FPS, fg),
-      &exp.fill(bg).fill(gr, exp.val.x).text(EXP, fg),
-      &gain.fill(bg).fill(gr, gain.val.x).text(GAIN, fg),
-      &btn_tune.fill(bg).text("TUNE", fg),
-      &btn_track.fill(bg).text("TRACK", fg),
-      &btn_match.fill(bg).text("MATCH", fg),
-      &btn_rec.fill(bg).text("CAPTURE", fg),
-  };
-  canvas.show(tiles).apply(fb);
+  x = 0;
+  y += btn_h;
+  Tile btn_lens(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w;
+  Tile btn_tune(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w;
+  Tile btn_calib(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w;
+  Tile btn_match(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
 
-  std::cerr << LOG_NAME "Start interaction" << std::endl;
+  x = 0;
+  y += btn_h;
+  Tile btn_tracking(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
+  x += 2 * btn_w;
+  Tile btn_stabilize(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
   // Enter event loop
   std::string task = "";
-  while (1) {
+  std::vector<Tile *> tiles = {
+      &btn_lens
+           .text("LENS") //
+           .use([&task](Tile &, bool) { task = "lens"; }),
+      &btn_tune
+           .text("TUNE") //
+           .use([&task](Tile &, bool) { task = "tune"; }),
+      &btn_calib
+           .text("CALIB") //
+           .use([&task](Tile &, bool) { task = "calib"; }),
+      &btn_match
+           .text("MATCH") //
+           .use([&task](Tile &, bool) { task = "match"; }),
+      &btn_tracking
+           .text("TRACKING") //
+           .use([&task](Tile &, bool) { task = "track"; }),
+      &btn_stabilize
+           .text("STABILIZE") //
+           .use([&task](Tile &, bool) { task = "stabilize"; }),
+  };
+  canvas.clear().show(splash.fill(splash_mat)).show(tiles).apply(fb);
+
+  std::cerr << LOG_NAME "Start interaction" << std::endl;
+  while (!global::flag_term) {
     if (task != "") {
       run_task(task);
       task = "";
     }
     const auto pos = fb.wait_pointer(true);
     // Check for corresponding tile
-    if (exp.handle(pos)) {
-      exp.fill(bg).fill(gr, exp.val.x);
-    }
-    if (fps.handle(pos)) {
-      fps.fill(bg).fill(gr, fps.val.x);
-    }
-    if (gain.handle(pos)) {
-      gain.fill(bg).fill(gr, gain.val.x);
-    }
-    if (btn_tune.button(pos, bg, gr))
-      task = "move";
-
-    if (btn_track.button(pos, bg, gr))
-      task = "track";
-
-    if (btn_match.button(pos, bg, gr))
-      task = "match";
-
-    if (btn_rec.button(pos, bg, gr))
-      task = "capture";
-
+    for (auto tile : tiles)
+      tile->handle(pos);
     canvas.show(tiles).apply(fb, &pos);
   }
   return 0;
+}
+
+void splash() {
+  auto &fb = *global::fb;
+  Canvas canvas(fb.shape());
+  const int w = fb.shape().width, h = fb.shape().height;
+  const cv::Mat splash_mat(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
+                           (char *)SPLASH_PNG_DATA);
+  const cv::Mat logo_mat(UF_LOGO_PNG_H, UF_LOGO_PNG_W, CV_8UC4,
+                         (char *)UF_LOGO_PNG_DATA);
+  const int logo_h = std::min(h / 8, w / 8), pad = w / 64;
+  Tile splash({0, 0, w, h - 3 * logo_h}, pad);
+  Tile logo({0, h - 2 * logo_h, w, logo_h}, 2 * pad);
+  splash.style.bg = logo.style.bg = color::mono(0);
+  canvas.clear()
+      .show(splash.fill(splash_mat))
+      .show(logo.fill(logo_mat))
+      .apply(fb);
 }

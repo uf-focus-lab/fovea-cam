@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <exception> // IWYU pragma: export
 #include <opencv2/opencv.hpp>
+#include <thread>
 
 #include "graphics/X11.h"
+#include "graphics/shared.h"
 #include "mems/mems.h"
 #include "threading/fast_io.h"
 #include "threading/fifo.h"
@@ -21,7 +23,31 @@
 
 namespace global {
 
-extern bool flag_term;
+typedef struct CamConfig {
+  double fps;  // Frame per second, negative means no limit
+  double exp;  // Exposure time in ms
+  double gain; // Gain (db)
+  bool updated = false;
+} CamConfig;
+
+typedef struct LensConfig {
+  double x, y, z; // 3 DOF Zoom Lens Configuration
+  double scale;   // Zoom (scale) ratio, shoule be greater than 1.0
+  bool updated = false;
+} LensConfig;
+
+typedef struct {
+  CamConfig wide, fovea;
+  LensConfig lens;
+} Config;
+
+extern const Config default_config;
+extern Config config;
+void load_config();
+void save_config();
+
+extern bool flag_back; // Flag to exit only to kiosk
+extern bool flag_term; // Flag to terminate entirely
 void init_signal();
 void deinit_signal();
 
@@ -34,12 +60,6 @@ extern Spinnaker::CameraPtr wide_camera, fovea_camera;
 
 void init_devices();
 void deinit_devices();
-
-typedef struct {
-  double fps, exp, gain, zoom;
-} Config;
-
-extern Config config;
 
 typedef struct {
   std::uint16_t tag;
@@ -65,6 +85,7 @@ typedef threading::FIFO<mems::Position> PosFIFO;
 typedef threading::FIFO<std::shared_ptr<mems::SyncWindow>> SyncFIFO;
 typedef threading::FastIO<cv::Mat> MatPipe;
 typedef threading::FastIO<global::Fovea> FoveaPipe;
+typedef threading::FIFO<graphics::PointerEvent> PointerFIFO;
 
 typedef struct Context {
   std::vector<global::ThreadInfo> threads;

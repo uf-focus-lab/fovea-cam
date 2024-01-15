@@ -4,7 +4,6 @@
 
 #include "util/vtconsole.h"
 
-#include <cstdlib>
 #include <iostream>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -12,8 +11,6 @@
 #include <string>
 
 int run_task(const std::string task) {
-  // Register signal handlers
-  global::init_signal();
   // Initialize devices
   global::init_devices();
   // Create general pipes
@@ -26,39 +23,45 @@ int run_task(const std::string task) {
   ctx.threads.push_back({"mems/rx", threads::mems_rx(ctx)});
   // Task specific threads
   std::cerr << "[main] Launching task: " << task << std::endl;
-  // if (task == "tune")
-  //   tasks::tune(ctx);
-  // else if (task == "track")
-  //   tasks::track(ctx);
-  // else if (task == "capture")
-  //   tasks::capture(ctx);
-  // else
-  if (task == "match")
+  if (task == "tune")
+    tasks::tune(ctx);
+  else if (task == "match")
     tasks::match(ctx);
   else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
     global::flag_term = true;
+    global::flag_back = true;
     ctx.close();
   }
   std::cerr << "[main] Task " << task << " finished" << std::endl;
   // Wait for threads to terminate
   ctx.join();
-  // Recover signal handlers
-  global::deinit_signal();
+  // Reset terminate flag if flag_back is also set
+  if (global::flag_back) {
+    global::flag_term = false;
+    global::flag_back = false;
+  }
   std::cerr << "[main] Terminating" << std::endl;
   return 0;
 }
 
 int kiosk();
+void splash();
 
 int main(const int argc, const char **argv) {
+  // Register signal handlers
+  global::init_signal();
+  global::load_config();
   global::init_display();
   int ret_val = 0;
   if (argc < 2)
     ret_val = kiosk();
   else
     ret_val = run_task(argv[1]);
+  splash();
   global::deinit_devices();
+  global::save_config();
+  global::deinit_signal();
   std::cerr << "[main] terminated with code " << ret_val << std::endl;
   return ret_val;
 }

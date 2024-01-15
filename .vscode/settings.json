@@ -1,16 +1,19 @@
 {
-    "C_Cpp.intelliSenseEngine": "disabled",
-    "editor.tabSize": 2,
-    "clangd.arguments": [
-        "--compile-commands-dir=build/"
-    ],
-    "cSpell.words": [
-        "altsetting",
-        "argparse",
-        "aruco",
-        "calib",
-        "fcmp",
-        "libusb"
-    ],
-    "editor.detectIndentation": false,
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "editor.tabSize": 2,
+  "clangd.arguments": [
+    "--compile-commands-dir=build/"
+  ],
+  "cSpell.words": [
+    "altsetting",
+    "argparse",
+    "aruco",
+    "calib",
+    "cbox",
+    "tbox",
+    "mbox",
+    "fcmp",
+    "libusb"
+  ],
+  "editor.detectIndentation": false,
 }

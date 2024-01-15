@@ -32,6 +32,6 @@ if __name__ == "__main__":
             if img.shape[2] == 4:
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
             for [b, g, r] in np.reshape(img, (-1, 3)):
-                pixel = f"0x{r:02x}{g:02x}{b:02x}" if (b or g or r) else "0"
+                pixel = f"0xFF{r:02x}{g:02x}{b:02x}" if (b or g or r) else "0"
                 print(pixel + ",", file=f, end="")
             print("};", file=f)

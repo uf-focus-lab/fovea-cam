@@ -1,15 +1,18 @@
 #include <iostream>
 
+#include "GUI.h"
 #include "global.h"
 #include "tasks.h"
 
-#include "calib/calib.h"
-#include "graphics/canvas.h"
-#include "graphics/tile.h"
-#include "threading/fast_io.h"
-#include "util/assert.h"
-#include "util/clamp.h"
+#include <calib/calib.h>
+#include <graphics/canvas.h>
+#include <graphics/tile.h>
+#include <memory>
+#include <thread>
+#include <util/assert.h>
+#include <util/clamp.h>
 
+#include <opencv2/opencv.hpp>
 #include <sstream>
 
 using namespace graphics;
@@ -17,64 +20,96 @@ using namespace graphics;
 #undef LOGNAME
 #define LOGNAME "[task:match:matcher] "
 
-void matcher(Context &ctx, MatPipe &match_out,
-             threading::FastIO<cv::Rect> &roi_out) {
-  try {
-    auto fovea = ctx.cap_fovea.read();
-    while (!global::flag_term) {
-      auto _fovea = ctx.cap_fovea.read();
-      if (_fovea == fovea || _fovea == nullptr)
-        continue;
-      fovea = _fovea;
-      // Get latest image
-      auto wide = ctx.cap_wide.read();
-      if (wide == nullptr)
-        continue;
-      // Convert volt range from [-90, 90] to [0, 1]
-      double x = fovea->x / 180.0 + 0.5, y = fovea->y / 180.0 + 0.5;
-      auto pos = calib::cvt(calib::VtoP, x, y);
-      // Calculate cropping region
-      cv::Rect roi = calib::roi(pos, wide->size(), global::config.zoom);
-      // Push to pipe
-      try {
-        match_out.write((*wide)(roi).clone());
-        roi_out.write(roi);
-      } catch (cv::Exception &e) {
-        std::cerr << LOGNAME "out of bound roi: " << roi << std::endl;
+std::thread matcher(Context &ctx, Tile &tile,
+                    threading::FastIO<cv::Rect> &roi_out) {
+  return std::thread([&]() {
+    try {
+      auto fovea = ctx.cap_fovea.read();
+      while (!global::flag_term) {
+        auto _fovea = ctx.cap_fovea.read();
+        if (_fovea == fovea || _fovea == nullptr)
+          continue;
+        fovea = _fovea;
+        // Get latest image
+        auto wide = ctx.cap_wide.read();
+        if (wide == nullptr)
+          continue;
+        // Convert volt range from [-90, 90] to [0, 1]
+        cv::Point2d volt = {fovea->x / 180.0 + 0.5, fovea->y / 180.0 + 0.5};
+        auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+        // Calculate cropping region
+        cv::Rect roi = calib::roi(pos, wide->size(), global::config.lens.scale);
+        // Push to pipe
+        try {
+          roi_out.write(roi);
+          tile.fill((*wide)(roi)).raster();
+        } catch (cv::Exception &e) {
+          std::cerr << LOGNAME "out of bound roi: " << roi << std::endl;
+        }
       }
     }
-  } catch (threading::END &) {
-    // Normal termination
-  }
-  CATCH_ASSERT(LOGNAME);
-  match_out.close();
-  roi_out.close();
-  ctx.close();
-  std::cerr << LOGNAME "terminated." << std::endl;
+    EXPECT_END_OF_STREAM
+    CATCH_ASSERT(LOGNAME);
+    roi_out.close();
+    ctx.close();
+    std::cerr << LOGNAME "terminated." << std::endl;
+  });
 }
 
 #undef LOGNAME
 #define LOGNAME "[task:match:calibrator] "
 
-bool flag_calibrating = false;
+enum {
+  // Calibration mode
+  STATE_INIT,
+  STATE_BUSY,
+  STATE_DONE,
+} calibrator_state = STATE_INIT;
 
-void calibrator(std::shared_ptr<cv::Mat> wide, std::shared_ptr<cv::Mat> fovea,
-                cv::Point2d initial_pos) {
+void calibrator(Context &ctx) {
   std::thread([&]() {
-    const auto &zoom = global::config.zoom;
-    double scale = 1 / zoom;
-    // Step 1: Create local copy of monochrome wide and fovea
-    cv::Mat wide_mono, fovea_mono;
-    cv::cvtColor(*wide, wide_mono, cv::COLOR_RGBA2GRAY);
-    cv::cvtColor(*fovea, fovea_mono, cv::COLOR_RGBA2GRAY);
-    // Step 2: scale down the fovea to match dpi with wide
-    cv::resize(fovea_mono, fovea_mono, {}, scale, scale, cv::INTER_AREA);
-    // Step 3: Equalize histogram of both images
-    cv::equalizeHist(wide_mono, wide_mono);
-    cv::equalizeHist(fovea_mono, fovea_mono);
-    // Step 4: Find the best match
-
-    // Step 5: Calculate the offset
+    try {
+      auto wide = ctx.cap_wide.read();
+      auto fovea = ctx.cap_fovea.read();
+      if (wide == nullptr || fovea == nullptr) {
+        calibrator_state = STATE_INIT;
+        std::cerr << LOGNAME "image not available" << std::endl;
+        return;
+      }
+      const double scale = 1.0 / global::config.lens.scale;
+      cv::Point2d volt = {fovea->x / 180.0 + 0.5, fovea->y / 180.0 + 0.5};
+      auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+      cv::Mat canvas, kernel;
+      // Step 1: scale down the fovea to match dpi with wide
+      cv::cvtColor(fovea->mat, kernel, cv::COLOR_BGRA2GRAY);
+      cv::resize(kernel, kernel, {}, scale, scale, cv::INTER_AREA);
+      const int w = kernel.cols, h = kernel.rows;
+      // Step 2: Crop the canvas to +- 50% range of the initial guess
+      cv::cvtColor(*wide, canvas, cv::COLOR_BGRA2GRAY);
+      cv::copyMakeBorder(canvas, canvas, h, h, w, w, cv::BORDER_REPLICATE);
+      cv::Point center = {
+          static_cast<int>(pos.x * static_cast<double>(wide->cols)),
+          static_cast<int>(pos.y * static_cast<double>(wide->rows))};
+      cv::Rect roi = {center.x, center.y, 2 * w, 2 * h};
+      canvas = canvas(roi).clone();
+      // Step 4: Find the best match
+      cv::Mat result;
+      cv::matchTemplate(canvas, kernel, result, cv::TM_CCOEFF_NORMED);
+      // Step 5: Calculate the offset
+      cv::Point offset;
+      cv::minMaxLoc(result, nullptr, nullptr, nullptr, &offset);
+      offset.x -= w / 2;
+      offset.y -= h / 2;
+      std::cerr << LOGNAME "offset: " << offset << std::endl;
+      // Finally, write result to calib::shift, and reset flag
+      calib::shift.x =
+          static_cast<double>(offset.x) / static_cast<double>(wide->cols);
+      calib::shift.y =
+          static_cast<double>(offset.y) / static_cast<double>(wide->rows);
+    }
+    EXPECT_END_OF_STREAM
+    CATCH_ASSERT(LOGNAME);
+    calibrator_state = STATE_DONE;
   }).detach();
 }
 
@@ -82,19 +117,9 @@ void calibrator(std::shared_ptr<cv::Mat> wide, std::shared_ptr<cv::Mat> fovea,
 #define LOGNAME "[task:match] "
 
 void tasks::match(Context &ctx) {
-  MatPipe match_pipe;
-  threading::FastIO<cv::Rect> roi_pipe;
-  auto match_thread = std::thread(matcher, std::ref(ctx), std::ref(match_pipe),
-                                  std::ref(roi_pipe));
   auto &fb = *global::fb;
   Canvas canvas(fb.shape());
   canvas.clear();
-  // Theme colors
-  const cv::Scalar bg(16, 16, 16, 255);
-  const cv::Scalar gr(96, 80, 64, 255);
-  const cv::Scalar red1(0, 0, 64, 255);
-  const cv::Scalar red2(0, 0, 128, 255);
-  const cv::Scalar fg(104, 221, 237, 255);
   // Prepare tiles for interaction
   const int w = fb.shape().width, h = fb.shape().height;
   const int pad = w / 64;
@@ -102,7 +127,6 @@ void tasks::match(Context &ctx) {
   const int note_h = btn_h / 2;
   const int img_h1 = std::min((h - btn_h) / 2, 2 * w / 5);
   const int img_h2 = h - img_h1 - btn_h - note_h;
-  std::cerr << "img_h1: " << img_h1 << ", img_h2: " << img_h2 << std::endl;
   // Create tiles
   int y = 0;
   Tile match_tile(cv::Rect{0, y, w / 2, img_h1}, pad);
@@ -111,84 +135,87 @@ void tasks::match(Context &ctx) {
   Tile wide_tile(cv::Rect{0, y, w, img_h2}, pad);
   y += img_h2;
   Tile notes(cv::Rect{0, y, w, note_h});
+  notes.style.text.height = 0.6;
+  notes.style.bg = color::mono(0);
+  notes.wipe();
   y += note_h;
-  Tile exit_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
+  auto back_btn = GUI::back_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
   Tile reset_btn(cv::Rect{btn_w, y, btn_w, btn_h}, pad);
   Tile calib_btn(cv::Rect{btn_w * 2, y, btn_w * 2, btn_h}, pad);
   std::vector<Tile *> tiles = {
-      &match_tile.fill(bg),
-      &fovea_tile.fill(bg),
-      &wide_tile.fill(bg),
-      &notes.text("current task: match", fg),
-      &exit_btn.fill(red1).text("EXIT", fg),
-      &reset_btn.fill(bg).text("RESET", fg),
-      &calib_btn.fill(bg).text("CALIBRATE", fg),
+      &match_tile,
+      &fovea_tile,
+      &wide_tile
+           .use(calib::cvt(calib::VtoP, {0.5, 0.5}) + calib::shift) //
+           .use([&ctx, &notes](Tile &tile, bool) {
+             auto pos = calib::cvt(calib::PtoV, tile.val - calib::shift);
+             pos.x = clamp(pos.x, 0.0, 1.0);
+             pos.y = clamp(pos.y, 0.0, 1.0);
+             double Vx = pos.x * 180.0 - 90.0, Vy = pos.y * 180.0 - 90.0;
+             ctx.mems_pos.flush().write({Vx, Vy, 0});
+             // Update notes
+             std::stringstream ss;
+             ss << "X " << std::fixed << std::setprecision(2) << Vx << "V"
+                << " | "
+                << "Y " << std::fixed << std::setprecision(2) << Vy << "V"
+                << " | "
+                << "S " << calib::shift;
+             notes.text(ss.str());
+           }),
+      &notes.text("current task: match"),
+      &back_btn,
+      &reset_btn.as(TileMode::BUTTON)
+           .text("RESET")
+           .use([&wide_tile](Tile &tile, bool) {
+             calib::shift = {0, 0};
+             wide_tile.render(true);
+           }),
+      &calib_btn.as(TileMode::BUTTON)
+           .text("CALIBRATE")
+           .use([&ctx](Tile &tile, bool) {
+             if (calibrator_state == STATE_INIT) {
+               calibrator_state = STATE_BUSY;
+               tile.text("CALIBRATING...");
+               calibrator(ctx);
+             }
+           }),
   };
+  // Launch worker threads
+  threading::FastIO<cv::Rect> roi_pipe;
+  std::vector<global::ThreadInfo> threads;
+  threads.push_back({
+      "matcher",
+      matcher(ctx, match_tile, roi_pipe),
+  });
+  threads.push_back({
+      "mat-renderer/wide",
+      GUI::mat_renderer(ctx.cap_wide, wide_tile, &roi_pipe),
+  });
+  threads.push_back({
+      "mat-renderer/fovea",
+      GUI::fovea_renderer(ctx.cap_fovea, fovea_tile, -1),
+  });
   // Render loop
   try {
-    auto match = match_pipe.read();
-    auto fovea = ctx.cap_fovea.read();
-    auto wide = ctx.cap_wide.read();
     while (!global::flag_term) {
       auto pos = fb.wait_pointer(false);
-
-      auto _match = match_pipe.read();
-      if (_match != match && _match != nullptr) {
-        match = _match;
-        match_tile.fill(*match);
+      for (auto &el : tiles)
+        el->handle(pos);
+      if (calibrator_state == STATE_DONE) {
+        calibrator_state = STATE_INIT;
+        calib_btn.text("CALIBRATE");
+        wide_tile.render(true);
       }
-
-      auto _fovea = ctx.cap_fovea.read();
-      if (_fovea != fovea && _fovea != nullptr) {
-        fovea = _fovea;
-        fovea_tile.fill(fovea->mat);
-      }
-
-      auto _wide = ctx.cap_wide.read();
-      if (_wide != wide && _wide != nullptr) {
-        wide = _wide;
-        // Draw ROI box
-        auto roi = roi_pipe.read();
-        if (roi != nullptr) {
-          cv::Mat mat = wide->clone();
-          cv::rectangle(mat, *roi, color::red(128), 4);
-          wide_tile.fill(mat);
-        } else {
-          wide_tile.fill(*wide);
-        }
-      }
-
-      if (wide_tile.handle(pos)) {
-        double x = wide_tile.val.x, y = wide_tile.val.y;
-        auto pos = calib::cvt(calib::PtoV, x, y);
-        pos.x = clamp(pos.x, 0.0, 1.0);
-        pos.y = clamp(pos.y, 0.0, 1.0);
-        double Vx = pos.x * 180.0 - 90.0, Vy = pos.y * 180.0 - 90.0;
-        ctx.mems_pos.write({Vx, Vy, 0});
-        // Update notes
-        std::stringstream ss;
-        // ss << "Vx: " << std::fixed << std::setprecision(2) << Vx << ", "
-        //    << "Vy: " << std::fixed << std::setprecision(2) << Vy;
-        ss << "src: " << wide_tile.val << ", "
-           << "dst: " << pos;
-        notes.text(ss.str(), fg);
-      }
-
-      if (exit_btn.button(pos, red1, red2))
-        global::flag_term = true;
-
-      if (reset_btn.button(pos, bg, gr))
-        ctx.mems_pos.write({0, 0, 0});
-
       canvas.show(tiles).apply(fb, &pos);
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
-  } catch (threading::END &) {
-    // Normal termination
   }
+  EXPECT_END_OF_STREAM
   CATCH_ASSERT(LOGNAME)
-  match_pipe.close();
   ctx.close();
-  std::cerr << LOGNAME "waiting for matcher." << std::endl;
-  match_thread.join();
+  for (auto &el : threads) {
+    std::cerr << LOGNAME "waiting for " << el.name << std::endl;
+    el.thread.join();
+  }
   std::cerr << LOGNAME "terminated." << std::endl;
 }

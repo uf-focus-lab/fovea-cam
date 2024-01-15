@@ -9,15 +9,15 @@
 #include <tuple>
 
 #undef LOGNAME
-#define LOGNAME "[threads:capture:configure]"
+#define LOGNAME "[threads:capture:configure] "
 
 // Only one thread can configure the camera at a time
-std::mutex config_mtx;
+std::mutex config_lock;
 
 void configure(const Spinnaker::CameraPtr &camera,
-               const bool is_zoom_camera = false) {
-  std::lock_guard<std::mutex> lock(config_mtx);
-  std::cerr << LOGNAME " Setting up " << camera->DeviceModelName().c_str()
+               const global::CamConfig config, bool is_zoom_camera = false) {
+  std::lock_guard<std::mutex> lock(config_lock);
+  std::cerr << LOGNAME "Setting up " << camera->DeviceModelName().c_str()
             << std::endl;
   { // Camera parameters
     auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
@@ -31,20 +31,19 @@ void configure(const Spinnaker::CameraPtr &camera,
     }
     // Capture parameters
     map.set("AcquisitionMode", "Continuous");
-    if (global::config.fps >= 1.0) {
-      std::cerr << "[threads::capture] Setting framerate to "
-                << global::config.fps << std::endl;
+    if (config.fps >= 1.0) {
+      std::cerr << LOGNAME "Setting framerate to " << config.fps << std::endl;
       map.set("AcquisitionFrameRateEnable", true);
-      map.set("AcquisitionFrameRate", global::config.fps);
+      map.set("AcquisitionFrameRate", config.fps);
     } else {
       map.set("AcquisitionFrameRateEnable", false);
     }
-    std::cerr << "[threads::capture] Setting exposure to " << global::config.exp
-              << " ms" << std::endl;
+    std::cerr << LOGNAME "Setting exposure to " << config.exp << " ms"
+              << std::endl;
     map.set("ExposureAuto", "Off");
-    map.set("ExposureTime", global::config.exp * 1000.0);
+    map.set("ExposureTime", config.exp * 1000.0);
     map.set("GainAuto", "Off");
-    map.set("Gain", is_zoom_camera ? global::config.gain : 0.0);
+    map.set("Gain", config.gain);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
@@ -76,13 +75,9 @@ void readout(const Spinnaker::CameraPtr &camera, CapPipe &out) {
     while (!global::flag_term) {
       out.write({camera->GetNextImage(), Time::us()});
     }
-  } catch (threading::END &) {
-    // Normal termination
-  } catch (Spinnaker::Exception &e) {
-    std::cerr << LOGNAME "Spinnaker Error: " << e.what() << std::endl;
-  } catch (...) {
-    std::cerr << LOGNAME "Unknown Error" << std::endl;
   }
+  EXPECT_END_OF_STREAM
+  CATCH_ASSERT(LOGNAME);
   out.close();
   // Release camera instance
   try {
@@ -102,7 +97,7 @@ std::thread threads::capture_wide(Context &ctx) {
     auto &out = ctx.cap_wide;
     const auto &camera = global::wide_camera;
     try {
-      configure(camera);
+      configure(camera, global::config.wide, false);
     } catch (std::exception &e) {
       std::cerr << LOGNAME "Error: " << e.what() << std::endl;
       out.close();
@@ -117,9 +112,8 @@ std::thread threads::capture_wide(Context &ctx) {
         auto mat = Spinnaker::fromImagePtr(img_ptr, 1);
         out.write(mat);
       }
-    } catch (threading::END &e) {
-      // Normal termination
     }
+    EXPECT_END_OF_STREAM
     CATCH_ASSERT(LOGNAME);
     cap.close();
     ctx.close();
@@ -138,7 +132,7 @@ std::thread threads::capture_fovea(Context &ctx) {
     auto &out = ctx.cap_fovea;
     const auto &camera = global::fovea_camera;
     try {
-      configure(camera, true);
+      configure(camera, global::config.fovea, true);
     } catch (std::exception &e) {
       std::cerr << "Error: " << e.what() << std::endl;
       out.close();
@@ -164,9 +158,8 @@ std::thread threads::capture_fovea(Context &ctx) {
                    .y = sync_window->position.y,
                    .mat = mat});
       }
-    } catch (threading::END &e) {
-      // Normal termination
     }
+    EXPECT_END_OF_STREAM
     CATCH_ASSERT(LOGNAME);
     ctx.close();
     cap.close();

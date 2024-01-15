@@ -5,7 +5,6 @@
 #include <condition_variable>
 #include <mutex>
 #include <queue>
-#include <thread>
 
 namespace threading {
 
@@ -25,7 +24,7 @@ private:
     if (closed) {
       lock.unlock();
       cond_w.notify_all();
-      throw threading::END();
+      throw EOS();
     }
     queue.push(data);
     cond_w.notify_all();
@@ -38,7 +37,7 @@ private:
     if (closed) {
       lock.unlock();
       cond_w.notify_all();
-      throw threading::END();
+      throw EOS();
     }
     queue.push(data);
     cond_w.notify_all();
@@ -52,6 +51,13 @@ public:
     return queue.empty();
   }
 
+  FIFO<T> &flush() {
+    std::unique_lock<std::mutex> lock(mutex);
+    while (!queue.empty())
+      queue.pop();
+    return *this;
+  }
+
   void write(T *data) { push(*data); }
   void write(T &data) { push(data); }
   void write(T &&data) { push(data); }
@@ -63,7 +69,7 @@ public:
     if (closed) {
       lock.unlock();
       cond_r.notify_all();
-      throw threading::END();
+      throw EOS();
     }
     T data = queue.front();
     queue.pop();

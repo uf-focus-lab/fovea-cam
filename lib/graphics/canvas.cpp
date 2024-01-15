@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
@@ -63,18 +64,18 @@ void Canvas::cursor_init(int size) {
   cursor_size = size;
   size *= 8;
   const cv::Size s(size, size);
-  cursor_up = cv::Mat(s, CV_8UC4, color::black(0));
-  cursor_down = cv::Mat(s, CV_8UC4, color::black(0));
+  cursor_up = cv::Mat(s, CV_8UC4, color::mono(0, 0));
+  cursor_down = cv::Mat(s, CV_8UC4, color::mono(0, 0));
   const int t = size / 16, r = size / 2 - t;
   const cv::Point c(size / 2, size / 2);
   // Draw hiDPI circle and then scale down
-  cv::circle(cursor_up, c, t, color::white(192), cv::FILLED);
-  cv::circle(cursor_up, c, t + t / 2, color::gray(192), t);
-  cv::circle(cursor_up, c, 2 * t + t / 2, color::black(128), t);
-  cv::circle(cursor_down, c, r, color::black(64), cv::FILLED);
-  cv::circle(cursor_down, c, t, color::white(192), cv::FILLED);
-  cv::circle(cursor_down, c, r, color::black(64), t);
-  cv::circle(cursor_down, c, r - t / 2, color::white(192), t);
+  cv::circle(cursor_up, c, t, color::mono(1, 0.75), cv::FILLED);
+  cv::circle(cursor_up, c, t + t / 2, color::mono(0.5, 0.75), t);
+  cv::circle(cursor_up, c, 2 * t + t / 2, color::mono(0, 0.5), t);
+  cv::circle(cursor_down, c, r, color::mono(0, 0.25), cv::FILLED);
+  cv::circle(cursor_down, c, t, color::mono(1, 0.75), cv::FILLED);
+  cv::circle(cursor_down, c, r, color::mono(0, 0.25), t);
+  cv::circle(cursor_down, c, r - t / 2, color::mono(1, 0.75), t);
   // Scale down
   const auto s_target = cv::Size(cursor_size, cursor_size);
   cv::resize(cursor_up, cursor_up, s_target, 0, 0, cv::INTER_AREA);
@@ -87,9 +88,8 @@ cv::Mat Canvas::handle_pointer(const PointerEvent *e) {
     const cv::Rect dst(e->x, e->y, cursor_size, cursor_size);
     const int bleed = cursor_size / 2;
     cv::copyMakeBorder(mat, disp, bleed, bleed, bleed, bleed,
-                       cv::BORDER_CONSTANT, color::black(255));
+                       cv::BORDER_CONSTANT, color::mono(0, 255));
     auto cursor = disp(dst).clone();
-    auto c = cv::Mat(dst.size(), CV_8UC4, color::red(128));
     alpha_blend(cursor, e->is_down(1) ? cursor_down : cursor_up);
     cursor.copyTo(disp(dst));
     return disp(cv::Rect(bleed, bleed, width, height)).clone();
@@ -194,15 +194,15 @@ Canvas &Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
 }
 
 Canvas &Canvas::show(Tile &tile, int transform) {
-  render(tile.raster(), {tile.bbox.x, tile.bbox.y}, transform);
+  auto readout = tile.read();
+  if (readout != nullptr)
+    render(readout->mat, {readout->bbox.x, readout->bbox.y}, transform);
   return *this;
 }
 
 Canvas &Canvas::show(std::vector<Tile *> &tiles, int transform) {
-  for (auto tile : tiles) {
-    if (tile->updated)
-      show(*tile, transform);
-  }
+  for (auto tile : tiles)
+    show(*tile, transform);
   return *this;
 }
 

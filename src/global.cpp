@@ -1,6 +1,7 @@
 #include "global.h"
 
 #include <csignal>
+#include <fstream>
 #include <glob.h>
 #include <iostream>
 #include <opencv2/opencv.hpp>
@@ -29,9 +30,96 @@ void Context::join() {
   threads.clear();
 }
 
+inline bool cfg(std::string &line, const char *key, double &value) {
+  const std::size_t pos = line.find('=');
+  if (pos == std::string::npos)
+    return false;
+  if (key != line.substr(0, pos))
+    return false;
+  const std::string raw_value = line.substr(pos + 1);
+  try {
+    value = std::stod(raw_value);
+  } catch (std::invalid_argument &) {
+    return false;
+  }
+  return true;
+}
+
+static const char *CONFIG_FILE = "/tmp/FoveaCam.env";
+
 namespace global {
 
+bool flag_back = false;
 bool flag_term = false;
+
+#undef LOGNAME
+#define LOGNAME "[global:config] "
+
+const Config default_config = {
+    // Wide camera config
+    {
+        .fps = -1.0,  // No limit
+        .exp = 16.66, // 60 fps
+        .gain = 0.0,  // No gain
+    },
+    // Fovea camera config
+    {
+        .fps = -1.0,  // No limit
+        .exp = 33.33, // 30 fps
+        .gain = 10.0,
+    },
+    // Motorized Lens config
+    {
+        .scale = 4.65, // x4.65
+    }};
+
+Config config(default_config);
+
+void load_config() {
+  std::ifstream env_file(CONFIG_FILE);
+  if (!env_file) {
+    std::cerr << LOGNAME "Unable to load config from " << CONFIG_FILE << ", "
+              << "using default config" << std::endl;
+    return;
+  }
+  std::string line;
+  while (std::getline(env_file, line)) {
+    false
+        // Wide camera config
+        || cfg(line, "WIDE.FPS", config.wide.fps)   //
+        || cfg(line, "WIDE.EXP", config.wide.exp)   //
+        || cfg(line, "WIDE.GAIN", config.wide.gain) //
+        // Fovea camera config
+        || cfg(line, "FOVEA.FPS", config.fovea.fps)   //
+        || cfg(line, "FOVEA.EXP", config.fovea.exp)   //
+        || cfg(line, "FOVEA.GAIN", config.fovea.gain) //
+        // Motorized Lens config
+        || cfg(line, "LENS.X", config.lens.x)         //
+        || cfg(line, "LENS.Y", config.lens.y)         //
+        || cfg(line, "LENS.Z", config.lens.z)         //
+        || cfg(line, "LENS.SCALE", config.lens.scale) //
+        ;
+  }
+}
+
+void save_config() {
+  std::ofstream env_file(CONFIG_FILE);
+  if (!env_file) {
+    std::cerr << LOGNAME "Unable to save config to " << CONFIG_FILE
+              << std::endl;
+    return;
+  }
+  env_file << "WIDE.FPS=" << config.wide.fps << std::endl
+           << "WIDE.EXP=" << config.wide.exp << std::endl
+           << "WIDE.GAIN=" << config.wide.gain << std::endl
+           << "FOVEA.FPS=" << config.fovea.fps << std::endl
+           << "FOVEA.EXP=" << config.fovea.exp << std::endl
+           << "FOVEA.GAIN=" << config.fovea.gain << std::endl
+           << "LENS.X=" << config.lens.x << std::endl
+           << "LENS.Y=" << config.lens.y << std::endl
+           << "LENS.Z=" << config.lens.z << std::endl
+           << "LENS.SCALE=" << config.lens.scale << std::endl;
+}
 
 void init_signal() {
   flag_term = false;
@@ -46,13 +134,6 @@ void deinit_signal() {
   signal(SIGKILL, SIG_DFL);
   signal(SIGTERM, SIG_DFL);
 }
-
-Config config = {
-    .fps = 0.0,   // Frame per second, 0 means no limit
-    .exp = 33.33, // Exposure time in ms
-    .gain = 30.0, // Gain, only applies to fovea camera
-    .zoom = 4.65  // Zoom ratio
-};
 
 graphics::X11FB *fb = nullptr;
 

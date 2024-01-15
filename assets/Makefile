@@ -1,3 +1,4 @@
+XXD := ../scripts/xxd.py
 ASSETS = $(wildcard *.png)
 ASSETS_H := $(patsubst %, %.h, $(ASSETS))
 ASSETS_C := $(patsubst %, %.c, $(ASSETS))
@@ -8,8 +9,8 @@ all: $(ASSETS_O)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.c: %
-	python3 ../scripts/xxd.py $<
+%.c: % $(XXD)
+	python3 $(XXD) $<
 
 clean:
 	@ echo "Cleaning assets"

@@ -18,6 +18,9 @@ public:
   catch (AssertionError & e) {                                                 \
     std::cerr << "[ASSERTION ERROR] " << e.what() << std::endl;                \
   }                                                                            \
+  catch (std::exception & e) {                                                 \
+    std::cerr << LOGNAME << e.what() << std::endl;                             \
+  }                                                                            \
   catch (...) {                                                                \
     std::cerr << LOGNAME "Unknown Error" << std::endl;                         \
   }

@@ -47,19 +47,19 @@ Coeff calib::PtoV = {.X = {1.64127143, -0.02880365, 0.01224670, -0.23854626},
       calib::VtoP = {.X = {0.60499259, -0.00989779, 0.00366316, 0.15776422},
                      .Y = {-0.04906417, -0.59860207, 0.05216969, 0.75147662}};
 
-cv::Point2d calib::shift = {0, 0};
+cv::Point2d calib::shift = {0.0, 0.0};
 
-cv::Point2d calib::cvt(Coeff C, double x, double y) {
-  double xy = x * y;
+cv::Point2d calib::cvt(Coeff C, cv::Point2d p) {
+  double xy = p.x * p.y;
   const auto &CX = C.X, &CY = C.Y;
   return {
-      CX.x * x + CX.y * y + CX.xy * xy + CX.c,
-      CY.x * x + CY.y * y + CY.xy * xy + CY.c,
+      CX.x * p.x + CX.y * p.y + CX.xy * xy + CX.c,
+      CY.x * p.x + CY.y * p.y + CY.xy * xy + CY.c,
   };
 }
 
 // [0, 1] -> [0, k * (1 - z)]
-int project(double r, double z, int k) {
+static inline int project(double r, double z, int k) {
   const double max = 1.0 - z;
   return static_cast<int>(clamp(r - 0.5 * z, 0.0, max) *
                           static_cast<double>(k));

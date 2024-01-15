@@ -21,7 +21,7 @@ private:
   // framebuffer will also have 2 times the size of vscreen
   uint8_t *framebuffer = NULL;
   const struct fb_fix_screeninfo finfo = {};
-  struct fb_var_screeninfo vinfo, vinfo_bk;
+  struct fb_var_screeninfo vinfo;
 
   void init_fd(std::string);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util/clamp.h"
 #include <opencv2/opencv.hpp>
 
 namespace graphics {
@@ -17,42 +18,28 @@ struct PointerEvent {
 
 } // namespace graphics
 
+#define DEFINE_COLOR(COLOR, R, G, B)                                           \
+  static inline const cv::Scalar COLOR(double level = 1.0,                     \
+                                       double alpha = 1.0) {                   \
+    level = clamp(level, 0.0, 1.0);                                            \
+    alpha = clamp(alpha, 0.0, 1.0);                                            \
+    const int b = static_cast<int>(255.0 * B * level);                         \
+    const int g = static_cast<int>(255.0 * G * level);                         \
+    const int r = static_cast<int>(255.0 * R * level);                         \
+    const int a = static_cast<int>(255.0 * alpha);                             \
+    return cv::Scalar_<int>(b, g, r, a);                                       \
+  }
+
 namespace color {
 
-static inline const cv::Scalar black(int alpha = 255) {
-  return cv::Scalar(0, 0, 0, alpha);
-}
+DEFINE_COLOR(mono, 1.0, 1.0, 1.0);
 
-static inline const cv::Scalar white(int alpha = 255) {
-  return cv::Scalar(255, 255, 255, alpha);
-}
+DEFINE_COLOR(red, 1.0, 0.0, 0.0);
+DEFINE_COLOR(green, 0.0, 1.0, 0.0);
+DEFINE_COLOR(blue, 0.0, 0.0, 1.0);
 
-static inline const cv::Scalar gray(int alpha = 255) {
-  return cv::Scalar(128, 128, 128, alpha);
-}
-
-static inline const cv::Scalar red(int alpha = 255) {
-  return cv::Scalar(0, 0, 255, alpha);
-}
-
-static inline const cv::Scalar green(int alpha = 255) {
-  return cv::Scalar(0, 255, 0, alpha);
-}
-
-static inline const cv::Scalar blue(int alpha = 255) {
-  return cv::Scalar(255, 0, 0, alpha);
-}
-
-static inline const cv::Scalar cyan(int alpha = 255) {
-  return cv::Scalar(255, 128, 0, alpha);
-}
-
-static inline const cv::Scalar yellow(int alpha = 255) {
-  return cv::Scalar(0, 255, 255, alpha);
-}
-
-static inline const cv::Scalar magenta(int alpha = 255) {
-  return cv::Scalar(255, 0, 255, alpha);
-}
+DEFINE_COLOR(yellow, 1.0, 1.0, 0.0);
+DEFINE_COLOR(cyan, 0.0, 1.0, 1.0);
+DEFINE_COLOR(magenta, 1.0, 0.0, 1.0);
 
 } // namespace color
