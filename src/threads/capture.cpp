@@ -11,6 +11,28 @@
 #undef LOGNAME
 #define LOGNAME "[threads:capture:configure] "
 
+void configure(Spinnaker::ConfigurableMap &map,
+               const global::CamConfig config) {
+  if (config.fps >= 1.0) {
+    map.set("AcquisitionFrameRateEnable", true);
+    map.set("AcquisitionFrameRate", config.fps);
+  } else {
+    map.set("AcquisitionFrameRateEnable", false);
+  }
+  map.set("ExposureAuto", "Off");
+  map.set("ExposureTime", config.exp * 1000.0);
+  map.set("GainAuto", "Off");
+  map.set("Gain", config.gain);
+  if (std::abs(config.gamma - 1.0) <= 0.01) {
+    map.set("GammaEnable", false);
+  } else {
+    map.set("GammaEnable", true);
+    map.set("Gamma", config.gamma);
+  }
+  map.set("BlackLevelSelector", "All");
+  map.set("BlackLevel", config.black);
+}
+
 // Only one thread can configure the camera at a time
 std::mutex config_lock;
 
@@ -31,27 +53,16 @@ void configure(const Spinnaker::CameraPtr &camera,
     }
     // Capture parameters
     map.set("AcquisitionMode", "Continuous");
-    if (config.fps >= 1.0) {
-      std::cerr << LOGNAME "Setting framerate to " << config.fps << std::endl;
-      map.set("AcquisitionFrameRateEnable", true);
-      map.set("AcquisitionFrameRate", config.fps);
-    } else {
-      map.set("AcquisitionFrameRateEnable", false);
-    }
-    std::cerr << LOGNAME "Setting exposure to " << config.exp << " ms"
-              << std::endl;
-    map.set("ExposureAuto", "Off");
-    map.set("ExposureTime", config.exp * 1000.0);
-    map.set("GainAuto", "Off");
-    map.set("Gain", config.gain);
+    configure(map, config);
     // Image format
     map.set("PixelFormat", "BayerRG8");
     // Try and set ADC bit depth to 14, 12, 10, 8
     false ||                               //
-        map.set("AdcBitDepth", "Bit14") || //
         map.set("AdcBitDepth", "Bit12") || //
         map.set("AdcBitDepth", "Bit10") || //
         map.set("AdcBitDepth", "Bit8");
+    // Disable auto white balance
+    map.set("BalanceWhiteAuto", "Off");
   }
   { // Stream parameters
     auto map = Spinnaker::ConfigurableMap(camera->GetTLStreamNodeMap());
@@ -70,23 +81,31 @@ typedef threading::FIFO<std::tuple<Spinnaker::ImagePtr, unsigned long>> CapPipe;
 #undef LOGNAME
 #define LOGNAME "[threads:capture:readout] "
 
-void readout(const Spinnaker::CameraPtr &camera, CapPipe &out) {
-  try {
-    while (!global::flag_term) {
-      out.write({camera->GetNextImage(), Time::us()});
+std::thread readout(const Spinnaker::CameraPtr &camera,
+                    global::CamConfig &config, CapPipe &out) {
+  return std::thread([&]() {
+    try {
+      auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
+      while (!global::flag_term) {
+        if (config.updated) {
+          configure(map, config);
+          config.updated = false;
+        }
+        out.write({camera->GetNextImage(), Time::us()});
+      }
     }
-  }
-  EXPECT_END_OF_STREAM
-  CATCH_ASSERT(LOGNAME);
-  out.close();
-  // Release camera instance
-  try {
-    std::cerr << LOGNAME "Stopping " +
-                     std::string(camera->DeviceModelName().c_str()) + "\n";
-    camera->EndAcquisition();
-  } catch (Spinnaker::Exception &e) {
-    std::cerr << LOGNAME "Error: " << e.what() << std::endl;
-  }
+    EXPECT_END_OF_STREAM
+    CATCH_ASSERT(LOGNAME);
+    out.close();
+    // Release camera instance
+    try {
+      std::cerr << LOGNAME "Stopping " +
+                       std::string(camera->DeviceModelName().c_str()) + "\n";
+      camera->EndAcquisition();
+    } catch (Spinnaker::Exception &e) {
+      std::cerr << LOGNAME "Error: " << e.what() << std::endl;
+    }
+  });
 };
 
 #undef LOGNAME
@@ -104,7 +123,7 @@ std::thread threads::capture_wide(Context &ctx) {
       return;
     }
     CapPipe cap;
-    std::thread reader(readout, std::ref(camera), std::ref(cap));
+    auto reader = readout(camera, global::config.wide, cap);
     try {
       while (!global::flag_term) {
         auto tuple = cap.read();
@@ -139,7 +158,7 @@ std::thread threads::capture_fovea(Context &ctx) {
       return;
     }
     CapPipe cap;
-    std::thread reader(readout, std::ref(camera), std::ref(cap));
+    auto reader = readout(camera, global::config.fovea, cap);
     try {
       auto sync_window = sync.read();
       while (!global::flag_term) {

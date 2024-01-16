@@ -24,9 +24,11 @@
 namespace global {
 
 typedef struct CamConfig {
-  double fps;  // Frame per second, negative means no limit
-  double exp;  // Exposure time in ms
-  double gain; // Gain (db)
+  double fps;   // Frame per second, negative means no limit
+  double exp;   // Exposure time in ms
+  double gain;  // Gain (db)
+  double gamma; // Gamma correction
+  double black; // Black level (percentage)
   bool updated = false;
 } CamConfig;
 

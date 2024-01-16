@@ -61,12 +61,16 @@ const Config default_config = {
         .fps = -1.0,  // No limit
         .exp = 16.66, // 60 fps
         .gain = 0.0,  // No gain
+        .gamma = 1.0, // Neutral gamma
+        .black = 0.0, // Full dynamic range
     },
     // Fovea camera config
     {
         .fps = -1.0,  // No limit
         .exp = 33.33, // 30 fps
-        .gain = 10.0,
+        .gain = 10.0, // 10 dB
+        .gamma = 1.0, // Neutral gamma
+        .black = 0.0, // Full dynamic range
     },
     // Motorized Lens config
     {
@@ -86,13 +90,17 @@ void load_config() {
   while (std::getline(env_file, line)) {
     false
         // Wide camera config
-        || cfg(line, "WIDE.FPS", config.wide.fps)   //
-        || cfg(line, "WIDE.EXP", config.wide.exp)   //
-        || cfg(line, "WIDE.GAIN", config.wide.gain) //
+        || cfg(line, "WIDE.FPS", config.wide.fps)     //
+        || cfg(line, "WIDE.EXP", config.wide.exp)     //
+        || cfg(line, "WIDE.GAIN", config.wide.gain)   //
+        || cfg(line, "WIDE.GAMMA", config.wide.gamma) //
+        || cfg(line, "WIDE.BLACK", config.wide.black) //
         // Fovea camera config
-        || cfg(line, "FOVEA.FPS", config.fovea.fps)   //
-        || cfg(line, "FOVEA.EXP", config.fovea.exp)   //
-        || cfg(line, "FOVEA.GAIN", config.fovea.gain) //
+        || cfg(line, "FOVEA.FPS", config.fovea.fps)     //
+        || cfg(line, "FOVEA.EXP", config.fovea.exp)     //
+        || cfg(line, "FOVEA.GAIN", config.fovea.gain)   //
+        || cfg(line, "FOVEA.GAMMA", config.fovea.gamma) //
+        || cfg(line, "FOVEA.BLACK", config.fovea.black) //
         // Motorized Lens config
         || cfg(line, "LENS.X", config.lens.x)         //
         || cfg(line, "LENS.Y", config.lens.y)         //
@@ -112,9 +120,13 @@ void save_config() {
   env_file << "WIDE.FPS=" << config.wide.fps << std::endl
            << "WIDE.EXP=" << config.wide.exp << std::endl
            << "WIDE.GAIN=" << config.wide.gain << std::endl
+           << "WIDE.GAMMA=" << config.wide.gamma << std::endl
+           << "WIDE.BLACK=" << config.wide.black << std::endl
            << "FOVEA.FPS=" << config.fovea.fps << std::endl
            << "FOVEA.EXP=" << config.fovea.exp << std::endl
            << "FOVEA.GAIN=" << config.fovea.gain << std::endl
+           << "FOVEA.GAMMA=" << config.fovea.gamma << std::endl
+           << "FOVEA.BLACK=" << config.fovea.black << std::endl
            << "LENS.X=" << config.lens.x << std::endl
            << "LENS.Y=" << config.lens.y << std::endl
            << "LENS.Z=" << config.lens.z << std::endl

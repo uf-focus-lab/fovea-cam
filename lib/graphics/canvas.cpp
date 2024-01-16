@@ -207,24 +207,27 @@ Canvas &Canvas::show(std::vector<Tile *> &tiles, int transform) {
 }
 
 Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
-  // Apply transform
-  const auto tile_transform = transform ^ this->transform;
-  auto dst = transform_mat(src, tile_transform);
-  auto corner_pos = transform_point(pos, shape(), tile_transform),
-       corner_off =
-           transform_point({0, 0}, {src.cols, src.rows}, tile_transform);
-  pos = corner_pos - corner_off;
-  // Check if trim is necessary
-  cv::Rect trim = {0, 0, dst.cols, dst.rows};
-  if (dst.cols + pos.x > static_cast<int>(width)) {
-    trim.width = width - pos.x;
+  try { // Apply transform
+    const auto tile_transform = transform ^ this->transform;
+    auto dst = transform_mat(src, tile_transform);
+    auto corner_pos = transform_point(pos, shape(), tile_transform),
+         corner_off =
+             transform_point({0, 0}, {src.cols, src.rows}, tile_transform);
+    pos = corner_pos - corner_off;
+    // Check if trim is necessary
+    cv::Rect trim = {0, 0, dst.cols, dst.rows};
+    if (dst.cols + pos.x > static_cast<int>(width)) {
+      trim.width = width - pos.x;
+    }
+    if (dst.rows + pos.y > static_cast<int>(height)) {
+      trim.height = height - pos.y;
+    }
+    dst = dst(trim);
+    // Place the display image to buffer
+    dst.copyTo(mat(cv::Rect(pos, dst.size())));
+  } catch (std::exception &e) {
+    std::cerr << "[graphics:Canvas] render(): " << e.what() << std::endl;
   }
-  if (dst.rows + pos.y > static_cast<int>(height)) {
-    trim.height = height - pos.y;
-  }
-  dst = dst(trim);
-  // Place the display image to buffer
-  dst.copyTo(mat(cv::Rect(pos, dst.size())));
   return *this;
 }
 

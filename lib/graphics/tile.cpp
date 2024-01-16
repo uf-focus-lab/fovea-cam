@@ -196,7 +196,7 @@ bool Tile::raster() {
 }
 
 Tile &Tile::wipe() {
-  bg.release();
+  bg = cv::Mat();
   updated = true;
   return *this;
 }
@@ -219,7 +219,7 @@ Tile &Tile::fill(double x1, double x2, double y1, double y2) {
 
 Tile &Tile::use(cv::Mat img) {
   if (img.empty()) {
-    mg.release();
+    mg = cv::Mat();
   } else {
     mg = img.clone();
     fit(mg, absolute(m_loc).size());
@@ -230,7 +230,7 @@ Tile &Tile::use(cv::Mat img) {
 
 Tile &Tile::text(std::string text) {
   if (text.empty()) {
-    fg.release();
+    fg = cv::Mat();
     return *this;
   }
   try {
@@ -288,16 +288,14 @@ bool Tile::handle(PointerEvent pos) {
 }
 
 bool Tile::render(bool force, bool state_change) {
-  std::cerr << LOG_NAME "Pointer " << (active ? "down" : "up") << " at " << val
-            << std::endl;
   if (mode == TileMode::GENERIC) {
     handler(*this, state_change);
   } else if (mode == TileMode::X_SLIDER) {
+    handler(*this, state_change);
     wipe().fill(val.x);
-    handler(*this, state_change);
   } else if (mode == TileMode::Y_SLIDER) {
-    wipe().fill(1.0, val.y);
     handler(*this, state_change);
+    wipe().fill(1.0, val.y);
   } else if (mode == TileMode::BUTTON && (state_change || force)) {
     fill();
     if (state_change && !active       //
