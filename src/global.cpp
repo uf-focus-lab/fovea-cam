@@ -45,7 +45,7 @@ inline bool cfg(std::string &line, const char *key, double &value) {
   return true;
 }
 
-static const char *CONFIG_FILE = "/tmp/FoveaCam.env";
+static const char *CONFIG_FILE = "/etc/FoveaCam";
 
 namespace global {
 
