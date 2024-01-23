@@ -87,7 +87,7 @@ public:
   Tile &use(std::function<void(Tile &, bool)> &&handler);
   // Returns true if new data is used for rendering, otherwise false.
   bool auto_raster = true;
-  bool raster();
+  Tile &raster();
   // Return a new tile with the same style and handler, but different bbox
   Tile &loc(cv::Rect bbox, int pad = 0);
   Tile &mbox(cv::Rect2d mbox);

@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <exception>
+#include <opencv2/imgproc.hpp>
 #include <sys/stat.h>
 
 #undef LOG_NAME
@@ -31,7 +32,7 @@ void fit(cv::Mat &m, cv::Size s) {
       const auto ratio =
           std::min(static_cast<double>(s.width) / static_cast<double>(m.cols),
                    static_cast<double>(s.height) / static_cast<double>(m.rows));
-      cv::resize(m, m, cv::Size(), ratio, ratio);
+      cv::resize(m, m, cv::Size(), ratio, ratio, cv::INTER_NEAREST);
     }
   } catch (std::exception &e) {
     std::cerr << LOG_NAME "Failed to fit mat " << m.size << " into " << s
@@ -120,7 +121,6 @@ bool Tile::is_active() { return active; }
 Tile &Tile::loc(cv::Rect box, int pad) {
   bbox = box;
   cbox = {pad, pad, box.width - pad * 2, box.height - pad * 2};
-  cv::Size content = {cbox.width, cbox.height};
   render(true);
   return *this;
 }
@@ -153,9 +153,9 @@ std::shared_ptr<const TileReadOut> Tile::read(bool once) {
   return nullptr;
 }
 
-bool Tile::raster() {
+Tile& Tile::raster() {
   if (!updated)
-    return false;
+    return *this;
   cv::Mat mat = cv::Mat(cv::Size{bbox.width, bbox.height}, CV_8UC4,
                         color::mono(0.0, 0.0));
   // 1. Render outline onto canvas
@@ -192,7 +192,7 @@ bool Tile::raster() {
   });
   // and reset readout flag
   readout = false;
-  return true;
+  return *this;
 }
 
 Tile &Tile::wipe() {
