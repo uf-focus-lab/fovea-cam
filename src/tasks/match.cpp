@@ -1,4 +1,8 @@
 #include <iostream>
+#include <memory>
+#include <opencv2/opencv.hpp>
+#include <sstream>
+#include <thread>
 
 #include "GUI.h"
 #include "global.h"
@@ -7,13 +11,8 @@
 #include <calib/calib.h>
 #include <graphics/canvas.h>
 #include <graphics/tile.h>
-#include <memory>
-#include <thread>
 #include <util/assert.h>
 #include <util/clamp.h>
-
-#include <opencv2/opencv.hpp>
-#include <sstream>
 
 using namespace graphics;
 
@@ -102,9 +101,9 @@ void calibrator(Context &ctx) {
       offset.y -= h / 2;
       std::cerr << LOGNAME "offset: " << offset << std::endl;
       // Finally, write result to calib::shift, and reset flag
-      calib::shift.x =
+      calib::shift.x +=
           static_cast<double>(offset.x) / static_cast<double>(wide->cols);
-      calib::shift.y =
+      calib::shift.y +=
           static_cast<double>(offset.y) / static_cast<double>(wide->rows);
     }
     EXPECT_END_OF_STREAM
@@ -116,6 +115,15 @@ void calibrator(Context &ctx) {
 #undef LOGNAME
 #define LOGNAME "[task:match] "
 
+std::string fixed(double value, bool s = true, unsigned n = 2, unsigned p = 2) {
+  std::stringstream ss;
+  char sign = value >= 0 ? '+' : '-';
+  value = std::abs(value);
+  ss << std::fixed << std::setprecision(p) << std::setw(n + p + 1)
+     << std::setfill(' ') << value;
+  return sign + ss.str();
+}
+
 void tasks::match(Context &ctx) {
   auto &fb = *global::fb;
   Canvas canvas(fb.shape());
@@ -125,11 +133,28 @@ void tasks::match(Context &ctx) {
   const int pad = w / 64;
   const int btn_h = w / 8, btn_w = w / 4;
   const int note_h = btn_h / 2;
-  const int img_h1 = std::min((h - btn_h) / 2, 2 * w / 5);
-  const int img_h2 = h - img_h1 - btn_h - note_h;
+  const int content_h = h - btn_h - note_h;
+  const int img_h1 = std::min(content_h / 2, 2 * w / 5);
+  const int img_h2 = content_h - img_h1;
   // Create tiles
   int y = 0;
   Tile match_tile(cv::Rect{0, y, w / 2, img_h1}, pad);
+  match_tile.use([](Tile &tile, bool state_change) {
+    static cv::Point2d val;
+    if (state_change) {
+      if (tile.is_active())
+        val = tile.val;
+      else
+        tile.text("");
+    } else if (tile.is_active()) {
+      auto delta = tile.val - val;
+      val = tile.val;
+      global::config.lens.scale += delta.x - delta.y;
+      std::stringstream ss;
+      ss << "SCALE " << fixed(global::config.lens.scale) << "x";
+      tile.text(ss.str());
+    }
+  });
   Tile fovea_tile(cv::Rect{w / 2, y, w / 2, img_h1}, pad);
   y += img_h1;
   Tile wide_tile(cv::Rect{0, y, w, img_h2}, pad);
@@ -154,11 +179,13 @@ void tasks::match(Context &ctx) {
              ctx.mems_pos.flush().write({Vx, Vy, 0});
              // Update notes
              std::stringstream ss;
-             ss << "X " << std::fixed << std::setprecision(2) << Vx << "V"
+             ss << "X " << fixed(Vx) << "V"
                 << " | "
-                << "Y " << std::fixed << std::setprecision(2) << Vy << "V"
+                << "Y " << fixed(Vy) << "V"
                 << " | "
-                << "S " << calib::shift;
+                << "Z " << fixed(global::config.lens.scale) << "x"
+                << " | "
+                << "Cal " << calib::shift;
              notes.text(ss.str());
            }),
       &notes.text("current task: match"),
@@ -206,7 +233,6 @@ void tasks::match(Context &ctx) {
         wide_tile.render(true);
       }
       canvas.show(tiles).apply(fb, &pos);
-      std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
   }
   EXPECT_END_OF_STREAM
