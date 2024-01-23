@@ -2,10 +2,10 @@
 #include "alpha.h"
 #include "graphics/X11.h"
 #include "shared.h"
+#include "util/time.h"
 
 #include <cstring>
 #include <iostream>
-#include <mutex>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
@@ -233,14 +233,21 @@ Canvas &Canvas::render(const cv::Mat &src, cv::Point pos, int transform) {
 
 Canvas &Canvas::apply(void *fb, const PointerEvent *event) {
   cv::Mat disp;
+  static unsigned long last_valid_pe;
   if (event != nullptr && event->valid) {
+    last_valid_pe = Time::ms();
     if (pe != nullptr) {
       delete pe;
     }
     pe = new PointerEvent(*event);
     disp = handle_pointer(event);
   } else if (pe != nullptr) {
-    disp = handle_pointer(pe);
+    if (Time::ms() - last_valid_pe > 500) {
+      delete pe;
+      pe = nullptr;
+    } else {
+      disp = handle_pointer(pe);
+    }
   } else {
     disp = mat;
   }
