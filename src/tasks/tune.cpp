@@ -115,12 +115,14 @@ cv::Point2d exp() {
   return {std::log2(clamp(exp, 1.0, 1024.0)) / 10.0};
 }
 
-std::string GAIN(double x) {
+std::string GAIN(double &x) {
   auto &gain = config->gain;
   if (x > 0.05)
     gain = clamp(x, 0.0, 1.0) * 40.0;
-  else
+  else {
+    x = 0.0;
     gain = 0.0;
+  }
   return "GAIN = " + str(gain);
 }
 
@@ -130,15 +132,18 @@ cv::Point2d gain() {
 }
 
 // [0.0, 0.5, 1.0] <-- 2 seg linear -> [0.25, 1.0, 4.0]
-std::string GAMMA(double x) {
+std::string GAMMA(double &x) {
   auto &gamma = config->gamma;
   x = clamp(x, 0.0, 1.0);
-  if (x > 0.51)
+  if (x > 0.52)
     gamma = 1.0 + (x - 0.5) * 3.0;
-  else if (x < 0.49)
+  else if (x < 0.48)
     gamma = 0.25 + 0.75 * x / 0.5;
-  else
+  else {
+    x = 0.5;
+    gamma = 1.0;
     return "GAMMA = OFF";
+  }
   return "GAMMA = " + str(gamma);
 }
 
@@ -157,13 +162,14 @@ cv::Point2d gamma() {
 std::string BLACK(double &x) {
   x = clamp(x, 0.25, 1.0);
   auto &black = config->black;
-  if (std::abs(x - 0.5) <= 0.01) {
+  if (std::abs(x - 0.5) <= 0.02) {
     x = 0.5;
     black = 0.0;
     return "BLACK = OFF";
+  } else {
+    black = (clamp(x, 0.0, 1.0) - 0.5) * 20.0;
+    return "BLACK = " + str(black);
   }
-  black = (clamp(x, 0.0, 1.0) - 0.5) * 20.0;
-  return "BLACK = " + str(black);
 }
 
 cv::Point2d black() {
