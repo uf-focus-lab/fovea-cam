@@ -1,4 +1,5 @@
 #include "global.h"
+#include "calib/calib.h"
 
 #include <csignal>
 #include <fstream>
@@ -15,6 +16,9 @@ void handle_signal(int) {
   global::deinit_signal();
 }
 
+#undef LOGNAME
+#define LOGNAME "[global:context] "
+
 void Context::close() {
   cap_wide.close();
   cap_fovea.close();
@@ -24,7 +28,7 @@ void Context::close() {
 
 void Context::join() {
   for (auto &el : threads) {
-    std::cerr << "[global::context] Waiting for " << el.name << std::endl;
+    std::cerr << LOGNAME "Waiting for " << el.name << std::endl;
     el.thread.join();
   }
   threads.clear();
@@ -106,8 +110,12 @@ void load_config() {
         || cfg(line, "LENS.Y", config.lens.y)         //
         || cfg(line, "LENS.Z", config.lens.z)         //
         || cfg(line, "LENS.SCALE", config.lens.scale) //
+        // Calibration results
+        || cfg(line, "CALIB.SHIFT.X", calib::shift.x) //
+        || cfg(line, "CALIB.SHIFT.Y", calib::shift.y) //
         ;
   }
+  std::cerr << LOGNAME "Config loaded from " << CONFIG_FILE << std::endl;
 }
 
 void save_config() {
@@ -130,7 +138,10 @@ void save_config() {
            << "LENS.X=" << config.lens.x << std::endl
            << "LENS.Y=" << config.lens.y << std::endl
            << "LENS.Z=" << config.lens.z << std::endl
-           << "LENS.SCALE=" << config.lens.scale << std::endl;
+           << "LENS.SCALE=" << config.lens.scale << std::endl
+           << "CALIB.SHIFT.X=" << calib::shift.x << std::endl
+           << "CALIB.SHIFT.Y=" << calib::shift.y << std::endl;
+  std::cerr << LOGNAME "Config written to " << CONFIG_FILE << std::endl;
 }
 
 void init_signal() {
