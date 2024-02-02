@@ -1,5 +1,4 @@
 #include <iostream>
-#include <memory>
 #include <opencv2/opencv.hpp>
 #include <sstream>
 #include <thread>
@@ -13,6 +12,7 @@
 #include <graphics/tile.h>
 #include <util/assert.h>
 #include <util/clamp.h>
+#include <util/fmt.h>
 
 using namespace graphics;
 
@@ -23,19 +23,19 @@ std::thread matcher(Context &ctx, Tile &tile,
                     threading::FastIO<cv::Rect> &roi_out) {
   return std::thread([&]() {
     try {
+      tile.auto_raster = false;
       auto fovea = ctx.cap_fovea.read();
       while (!global::flag_term) {
-        auto _fovea = ctx.cap_fovea.read();
-        if (_fovea == fovea || _fovea == nullptr)
-          continue;
-        fovea = _fovea;
-        // Get latest image
-        auto wide = ctx.cap_wide.read();
-        if (wide == nullptr)
-          continue;
+        ctx.cap_fovea.next(fovea, true);
+        // std::cerr << LOGNAME "FOVEA: (" << fmt(fovea->x, 2, 2) << ", "
+        //           << fmt(fovea->y, 2, 2) << ") @" << fovea->tag << std::endl;
         // Convert volt range from [-90, 90] to [0, 1]
         cv::Point2d volt = {fovea->x / 180.0 + 0.5, fovea->y / 180.0 + 0.5};
         auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+        // Get latest wide frame
+        auto wide = ctx.cap_wide.read();
+        if (wide == nullptr)
+          continue;
         // Calculate cropping region
         cv::Rect roi = calib::roi(pos, wide->size(), global::config.lens.scale);
         // Push to pipe
@@ -160,7 +160,7 @@ void tasks::match(Context &ctx) {
   Tile wide_tile(cv::Rect{0, y, w, img_h2}, pad);
   y += img_h2;
   Tile notes(cv::Rect{0, y, w, note_h});
-  notes.tbox({0, .2, 1, .6});
+  notes.tbox({0, .25, 1, .5});
   notes.style.bg = color::mono(0);
   y += note_h;
   auto back_btn = GUI::back_btn(cv::Rect{0, y, btn_w, btn_h}, pad);
@@ -176,16 +176,15 @@ void tasks::match(Context &ctx) {
              pos.x = clamp(pos.x, 0.0, 1.0);
              pos.y = clamp(pos.y, 0.0, 1.0);
              double Vx = pos.x * 180.0 - 90.0, Vy = pos.y * 180.0 - 90.0;
-             ctx.mems_pos.flush().write({Vx, Vy, 0});
+             static uint8_t tag = 0;
+             ctx.mems_pos.flush().write({Vx, Vy, tag++});
              // Update notes
              std::stringstream ss;
-             ss << "X " << fixed(Vx) << "V"
-                << " | "
-                << "Y " << fixed(Vy) << "V"
-                << " | "
+             ss << "V " << fixed(Vx) << ", " << fixed(Vy) << " | "
                 << "Z " << fixed(global::config.lens.scale) << "x"
                 << " | "
-                << "Cal " << calib::shift;
+                << "S " << fmt(calib::shift.x, 1, 3) + '%' << ", "
+                << fmt(calib::shift.y, 1, 3) + '%';
              notes.text(ss.str());
            }),
       &notes.text("current task: match"),
