@@ -18,7 +18,7 @@ private:
   size_t max_size = 0;
 
   void push(T data) {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock lock(mutex);
     while (max_size > 0 && queue.size() >= max_size && !closed)
       cond_r.wait(lock);
     if (closed) {
@@ -31,7 +31,7 @@ private:
   }
 
   void push(T &&data) {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock lock(mutex);
     while (max_size > 0 && queue.size() >= max_size && !closed)
       cond_r.wait(lock);
     if (closed) {
@@ -46,13 +46,22 @@ private:
 public:
   FIFO(size_t max_size = 0) : max_size(max_size) {}
 
+  void wait_read() {
+    std::unique_lock lock(mutex);
+    if (closed)
+      throw EOS();
+    cond_r.wait(lock);
+    if (closed)
+      throw EOS();
+  }
+
   bool empty() {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard lock(mutex);
     return queue.empty();
   }
 
   FIFO<T> &flush() {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::lock_guard lock(mutex);
     while (!queue.empty())
       queue.pop();
     return *this;
@@ -63,7 +72,7 @@ public:
   void write(T &&data) { push(data); }
 
   T read() {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock lock(mutex);
     while (queue.empty() && !closed)
       cond_w.wait(lock);
     if (closed) {
@@ -79,7 +88,7 @@ public:
   }
 
   void close(bool wait_empty = false) {
-    std::unique_lock<std::mutex> lock(mutex);
+    std::unique_lock lock(mutex);
     if (wait_empty) {
       while (!queue.empty())
         cond_r.wait(lock);
