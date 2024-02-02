@@ -167,11 +167,16 @@ std::thread threads::capture_fovea(Context &ctx) {
         auto ts = std::get<1>(tuple);
         auto mat = Spinnaker::fromImagePtr(img_ptr, 1);
         // Find the matching sync window
-        while (sync_window->test(ts) > 0) {
+        while (1) {
+          if (sync_window->test(ts) <= 0)
+            break;
+          if (sync.empty())
+            break;
+          if (global::flag_term)
+            break;
           sync_window = sync.read();
         }
         // Construct and broadcast next fovea frame
-        // BroadCast
         out.write({.tag = sync_window->tag(),
                    .x = sync_window->position.x,
                    .y = sync_window->position.y,
