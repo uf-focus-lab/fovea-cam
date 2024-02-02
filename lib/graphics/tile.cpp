@@ -153,7 +153,7 @@ std::shared_ptr<const TileReadOut> Tile::read(bool once) {
   return nullptr;
 }
 
-Tile& Tile::raster() {
+Tile &Tile::raster() {
   if (!updated)
     return *this;
   cv::Mat mat = cv::Mat(cv::Size{bbox.width, bbox.height}, CV_8UC4,
@@ -288,12 +288,12 @@ bool Tile::handle(PointerEvent pos) {
 }
 
 bool Tile::render(bool force, bool state_change) {
-  if (mode == TileMode::GENERIC) {
+  if (mode == TileMode::GENERIC && (active || state_change || force)) {
     handler(*this, state_change);
-  } else if (mode == TileMode::X_SLIDER) {
+  } else if (mode == TileMode::X_SLIDER && (active || force)) {
     handler(*this, state_change);
     wipe().fill(val.x);
-  } else if (mode == TileMode::Y_SLIDER) {
+  } else if (mode == TileMode::Y_SLIDER && (active || force)) {
     handler(*this, state_change);
     wipe().fill(1.0, val.y);
   } else if (mode == TileMode::BUTTON && (state_change || force)) {

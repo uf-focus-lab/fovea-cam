@@ -56,8 +56,6 @@ protected:
   // will take into consideration under filled gaps
   cv::Rect absolute(const cv::Rect2d &);
   cv::Rect absolute(const cv::Rect2d &, cv::Mat &);
-  // Flag to indicate the need for re-rendering
-  bool updated = false;
   // Flag to indicate if latest canvas has been read
   bool readout = false;
   // Flag to indicate the tile is active
@@ -85,6 +83,8 @@ public:
   std::function<void(Tile &, bool)> handler = [](Tile &, bool) {};
   Tile &use(std::function<void(Tile &, bool)> &handler);
   Tile &use(std::function<void(Tile &, bool)> &&handler);
+  // Flag to indicate the need for re-rendering
+  bool updated = false;
   // Returns true if new data is used for rendering, otherwise false.
   bool auto_raster = true;
   Tile &raster();
