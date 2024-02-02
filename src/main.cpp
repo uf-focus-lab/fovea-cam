@@ -27,6 +27,8 @@ int run_task(const std::string task) {
     tasks::tune(ctx);
   else if (task == "match")
     tasks::match(ctx);
+  else if (task == "track")
+    tasks::track(ctx);
   else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
     global::flag_term = true;
@@ -41,6 +43,8 @@ int run_task(const std::string task) {
     global::flag_term = false;
     global::flag_back = false;
   }
+  // Save config
+  global::save_config();
   std::cerr << "[main] Terminating" << std::endl;
   return 0;
 }
