@@ -73,7 +73,7 @@ public:
     fb = (unsigned char *)malloc(fb_bytes);
     img = XCreateImage(display, vinfo.visual, vinfo.depth, ZPixmap, 0,
                        (char *)fb, width, height, 8, bytes_per_line);
-    if (img == 0) {
+    if (img == nullptr) {
       fprintf(stderr, LOG_NAME "XImage is null!\n");
       return;
     } else {
