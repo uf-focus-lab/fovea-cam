@@ -18,8 +18,6 @@ public:
   }
 };
 
-extern long delay;
-
 class SyncWindow {
 
 private:
@@ -30,7 +28,8 @@ private:
 
 public:
   Position position;
-  SyncWindow(Position pos = Position(0, 0, 0));
+  long delay;
+  SyncWindow(Position pos = Position(0, 0, 0), long delay = 2000 /* us */);
   // Called by mems recv upon arrival of next sync window.
   std::shared_ptr<SyncWindow> conclude(Position next);
   // Getter of the tag for this window
@@ -38,8 +37,7 @@ public:
   /*
    * Check if given time falls within this sync window.
    */
-  int test(const unsigned long time = Time::us(),
-           const unsigned long offset = delay);
+  int test(const unsigned long time = Time::us());
 };
 
 } // namespace mems
