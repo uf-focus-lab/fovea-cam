@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ $# -eq 0 ]
+then
+   OUTFILE="rec.mp4"
+else
+   OUTFILE=$@
+fi
+
+CMD="
+	-f x11grab \
+	-i :0 \
+	-preset ultrafast \
+	-c:v libx264rgb \
+	$OUTFILE
+"
+
+echo ffmpeg $CMD
+ffmpeg -y $CMD
