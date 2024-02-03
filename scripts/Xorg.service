@@ -7,7 +7,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/usr/lib/xorg/Xorg -noreset :0
+ExecStart=/usr/lib/xorg/Xorg -nocursor -noreset :0
 
 [Install]
 WantedBy=graphical.target
