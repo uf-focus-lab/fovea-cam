@@ -2,7 +2,7 @@
 
 if [ $# -eq 0 ]
 then
-   OUTFILE="rec.mp4"
+   OUTFILE="rec.avi"
 else
    OUTFILE=$@
 fi
@@ -10,8 +10,7 @@ fi
 CMD="
 	-f x11grab \
 	-i :0 \
-	-preset ultrafast \
-	-c:v libx264rgb \
+	-c:v rawvideo -pix_fmt yuv420p \
 	$OUTFILE
 "
 
