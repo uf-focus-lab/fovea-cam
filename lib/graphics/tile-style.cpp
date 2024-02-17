@@ -22,6 +22,8 @@ const TileStyleSheet default_style = {
             .weight = 2.0,
             .inset = 0.2,
             .color = color::mono(1),
+            .bg = color::mono(0, 0),
+            .align = Align::CC,
         },
 };
 

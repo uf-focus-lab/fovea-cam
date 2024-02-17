@@ -12,6 +12,26 @@ struct TileReadOut {
 namespace graphics {
 
 typedef enum TileMode { GENERIC, BUTTON, X_SLIDER, Y_SLIDER } TileMode;
+typedef enum Align {
+  // Horizontal components
+  __HL__ = 0b100000,
+  __HC__ = 0b010000,
+  __HR__ = 0b001000,
+  // Vertical components
+  __VT__ = 0b000100,
+  __VC__ = 0b000010,
+  __VB__ = 0b000001,
+  // Combinations
+  TL = Align::__VT__ | Align::__HL__,
+  TC = Align::__VT__ | Align::__HC__,
+  TR = Align::__VT__ | Align::__HR__,
+  CL = Align::__VC__ | Align::__HL__,
+  CC = Align::__VC__ | Align::__HC__,
+  CR = Align::__VC__ | Align::__HR__,
+  BL = Align::__VB__ | Align::__HL__,
+  BC = Align::__VB__ | Align::__HC__,
+  BR = Align::__VB__ | Align::__HR__,
+} Align;
 
 typedef struct TileStyle {
   cv::Scalar fill;
@@ -21,14 +41,18 @@ typedef struct TileStyle {
   } outline;
 } TileStyle;
 
+typedef struct TextStyle {
+  double weight;
+  double inset; // relative to height
+  cv::Scalar color;
+  cv::Scalar bg;
+  Align align;
+} TextStyle;
+
 typedef struct TileStyleSheet {
   cv::Scalar bg;
   TileStyle normal, active;
-  struct {
-    double weight;
-    double inset; // relative to height
-    cv::Scalar color;
-  } text;
+  TextStyle text;
 } TileStyleSheet;
 
 extern const TileStyleSheet default_style;
@@ -55,7 +79,7 @@ protected:
   // Absolute area in pixels, relative to canvas
   // will take into consideration under filled gaps
   cv::Rect absolute(const cv::Rect2d &);
-  cv::Rect absolute(const cv::Rect2d &, cv::Mat &);
+  cv::Rect absolute(const cv::Rect2d &, cv::Mat &, Align align = Align::CC);
   // Flag to indicate if latest canvas has been read
   bool readout = false;
   // Flag to indicate the tile is active

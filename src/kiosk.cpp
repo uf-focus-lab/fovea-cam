@@ -37,41 +37,44 @@ int kiosk() {
   Tile splash({0, 0, w, y}, 2 * pad);
   splash.style.bg = color::mono(0);
 
+  // ======================== Calibration Tasks ========================
   x = 0;
   y += btn_h;
-  Tile btn_lens(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
-  x += btn_w;
   Tile btn_tune(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w;
+  Tile btn_align(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
   x += btn_w;
   Tile btn_calib(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
   x += btn_w;
   Tile btn_match(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
 
+  // ======================== Application Tasks ========================
   x = 0;
   y += btn_h;
   Tile btn_tracking(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
   x += 2 * btn_w;
   Tile btn_stabilize(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
+
   // Enter event loop
   std::string task = "";
   std::vector<Tile *> tiles = {
-      &btn_lens
-           .text("LENS") //
-           .use([&task](Tile &, bool) { task = "lens"; }),
       &btn_tune
-           .text("TUNE") //
+           .text("Tune") //
            .use([&task](Tile &, bool) { task = "tune"; }),
+      &btn_align
+           .text("Align") //
+           .use([&task](Tile &, bool) { task = "align"; }),
       &btn_calib
-           .text("CALIB") //
-           .use([&task](Tile &, bool) { task = "calib"; }),
+           .text("ArUco") //
+           .use([&task](Tile &, bool) { task = "aruco"; }),
       &btn_match
-           .text("MATCH") //
+           .text("Match") //
            .use([&task](Tile &, bool) { task = "match"; }),
       &btn_tracking
-           .text("TRACKING") //
+           .text("Tracking") //
            .use([&task](Tile &, bool) { task = "track"; }),
       &btn_stabilize
-           .text("STABILIZE") //
+           .text("Stabilize") //
            .use([&task](Tile &, bool) { task = "stabilize"; }),
   };
   canvas.clear().show(splash.use(splash_mat)).show(tiles).apply(fb);

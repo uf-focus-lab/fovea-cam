@@ -1,4 +1,5 @@
 #include "global.h"
+#include "outfile.h"
 #include "tasks.h"
 #include "threads.h"
 
@@ -11,6 +12,8 @@
 #include <string>
 
 int run_task(const std::string task) {
+  // Initialize outfile prefix
+  outfile::init(task);
   // Initialize devices
   global::init_devices();
   // Create general pipes
@@ -25,6 +28,10 @@ int run_task(const std::string task) {
   std::cerr << "[main] Launching task: " << task << std::endl;
   if (task == "tune")
     tasks::tune(ctx);
+  else if (task == "align")
+    tasks::align(ctx);
+  else if (task == "aruco")
+    tasks::aruco(ctx);
   else if (task == "match")
     tasks::match(ctx);
   else if (task == "track")
@@ -43,6 +50,8 @@ int run_task(const std::string task) {
     global::flag_term = false;
     global::flag_back = false;
   }
+  // Confirm out files to save
+  outfile::conclude();
   // Save config
   global::save_config();
   std::cerr << "[main] Terminating" << std::endl;

@@ -10,10 +10,11 @@
     "aruco",
     "calib",
     "cbox",
-    "tbox",
-    "mbox",
     "fcmp",
-    "libusb"
+    "libusb",
+    "mbox",
+    "tbox",
+    "xhair"
   ],
   "editor.detectIndentation": false,
 }

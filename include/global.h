@@ -70,13 +70,6 @@ typedef struct {
 } Fovea;
 
 typedef struct {
-  // ArUco marker ID embedded in the image
-  int id;
-  // Center Position of the detected marker
-  std::vector<cv::Point2f> corners;
-} ArUcoInfo;
-
-typedef struct {
   std::string name;
   std::thread thread;
 } ThreadInfo;
@@ -98,5 +91,3 @@ typedef struct Context {
   void close();
   void join();
 } Context;
-
-typedef threading::FastIO<std::vector<global::ArUcoInfo>> ArUcoPipe;

@@ -115,15 +115,6 @@ void calibrator(Context &ctx) {
 #undef LOGNAME
 #define LOGNAME "[task:match] "
 
-std::string fixed(double value, bool s = true, unsigned n = 2, unsigned p = 2) {
-  std::stringstream ss;
-  char sign = value >= 0 ? '+' : '-';
-  value = std::abs(value);
-  ss << std::fixed << std::setprecision(p) << std::setw(n + p + 1)
-     << std::setfill(' ') << value;
-  return sign + ss.str();
-}
-
 void tasks::match(Context &ctx) {
   auto &fb = *global::fb;
   Canvas canvas(fb.shape());
@@ -151,7 +142,7 @@ void tasks::match(Context &ctx) {
       val = tile.val;
       global::config.lens.scale += delta.x - delta.y;
       std::stringstream ss;
-      ss << "SCALE " << fixed(global::config.lens.scale) << "x";
+      ss << "SCALE " << fmt(global::config.lens.scale, 2, 2, ' ', false) << "x";
       tile.text(ss.str());
     }
   });
@@ -180,8 +171,9 @@ void tasks::match(Context &ctx) {
              ctx.mems_pos.flush().write({Vx, Vy, tag++});
              // Update notes
              std::stringstream ss;
-             ss << "V " << fixed(Vx) << ", " << fixed(Vy) << " | "
-                << "Z " << fixed(global::config.lens.scale) << "x"
+             ss << "V " << fmt(Vx, 2, 2) << ", " << fmt(Vy, 2, 2) << " | "
+                << "Z " << fmt(global::config.lens.scale, 2, 2, ' ', false)
+                << "x"
                 << " | "
                 << "S " << fmt(calib::shift.x, 1, 3) + '%' << ", "
                 << fmt(calib::shift.y, 1, 3) + '%';

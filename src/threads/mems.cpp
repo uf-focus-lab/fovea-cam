@@ -97,8 +97,8 @@ std::thread threads::mems_tx(Context &ctx) {
         // Send position until ACK
         bool flag_next = false;
         while (!flag_next && !global::flag_term) {
-          std::cerr << LOGNAME "Move to (" << fmt(pos.x, 2, 2) << ", "
-                    << fmt(pos.y, 2, 2) << ") @" << pos.field.tag << std::endl;
+          // std::cerr << LOGNAME "Move to (" << fmt(pos.x, 2, 2) << ", "
+          //           << fmt(pos.y, 2, 2) << ") @" << pos.field.tag << std::endl;
           // Send frame
           SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
           // Check for ACK

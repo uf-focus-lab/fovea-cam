@@ -60,15 +60,21 @@ cv::Rect Tile::absolute(const cv::Rect2d &loc) {
   };
 };
 
-cv::Rect Tile::absolute(const cv::Rect2d &loc, cv::Mat &mat) {
+cv::Rect Tile::absolute(const cv::Rect2d &loc, cv::Mat &mat, Align align) {
   cv::Rect box = absolute(loc);
   fit(mat, box.size());
   if (mat.cols < box.width) {
-    box.x += (box.width - mat.cols) / 2;
+    if (align & Align::__HC__)
+      box.x += (box.width - mat.cols) / 2;
+    else if (align & Align::__HR__)
+      box.x += box.width - mat.cols;
     box.width = mat.cols;
   }
   if (mat.rows < box.height) {
-    box.y += (box.height - mat.rows) / 2;
+    if (align & Align::__VC__)
+      box.y += (box.height - mat.rows) / 2;
+    else if (align & Align::__VB__)
+      box.y += box.height - mat.rows;
     box.height = mat.rows;
   }
   ASSERT(mat.cols == box.width && mat.rows == box.height,
@@ -180,7 +186,14 @@ Tile &Tile::raster() {
   }
   // 4. Blend fg onto canvas (optional)
   if (!fg.empty()) {
-    cv::Mat text = mat(absolute(t_loc, fg));
+    // Draw text background (optional)
+    if (style.text.bg[3] >= 1 / 256.0) {
+      auto loc = absolute(t_loc);
+      cv::Mat roi = mat(loc);
+      cv::Mat mask(cv::Size{loc.width, loc.height}, CV_8UC4, style.text.bg);
+      alpha_blend(roi, mask);
+    }
+    cv::Mat text = mat(absolute(t_loc, fg, style.text.align));
     alpha_blend(text, fg, text);
   }
   // last, unset updated flag
