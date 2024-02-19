@@ -8,6 +8,7 @@ Type=simple
 Restart=always
 RestartSec=5
 User=root
+WorkingDirectory=/home/data
 ExecStart=/home/yuxuan/fovea-cam/build/FoveaCam
 # ExecStart=/home/yuxuan/fovea-cam/scripts/kiosk.sh
 
