@@ -5,6 +5,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <sstream>
+#include <string>
 #include <thread>
 
 #include "GUI.h"
@@ -56,9 +57,19 @@ std::thread pid_controller(Context &ctx, ArUcoPipe &aruco_wide_in,
     outfile::Item *out = nullptr;
     try {
       int prev_id = 0;
+      std::string info_volt = "N/A", info_wide = "N/A", info_fovea = "N/A";
       ctx.mems_pos.write({0.0, 0.0});
-      auto aruco_fovea_vec = aruco_fovea_in.read();
+      auto aruco_fovea_vec = aruco_fovea_in.read(),
+           aruco_wide_vec = aruco_wide_in.read();
       while (!global::flag_term) {
+        // Update wide aruco info string
+        if (aruco_wide_in.next(aruco_wide_vec, false) &&
+            aruco_wide_vec->size() > 0) {
+          auto &aruco_wide = aruco_wide_vec->at(0);
+          info_wide = "";
+          for (const auto &p : aruco_wide.corners)
+            info_wide += std::to_string(p.x) + "," + std::to_string(p.y) + " ";
+        }
         // Check if position is available
         aruco_fovea_in.next(aruco_fovea_vec, true);
         if (aruco_fovea_vec->size() == 0)
@@ -78,27 +89,25 @@ std::thread pid_controller(Context &ctx, ArUcoPipe &aruco_wide_in,
         auto aruco_wide_vec = aruco_wide_in.read();
         if (aruco_wide_vec == nullptr || aruco_wide_vec->size() == 0)
           continue;
-        auto &aruco_wide = aruco_wide_vec->at(0);
         // Check if the marker is the same
         if (prev_id != 0 && aruco_fovea.id == 0) {
           std::stringstream ss;
-          ss << "id = " << prev_id << "; ";
-          ss << "volt = " << aruco_fovea.volt.x << ", " << aruco_fovea.volt.y
-             << "; ";
-          ss << "wide = ";
-          for (const auto &p : aruco_wide.corners)
-            ss << p.x << ", " << p.y << "; ";
-          ss << "fovea = ";
-          for (const auto &p : aruco_fovea.corners)
-            ss << p.x << ", " << p.y << "; ";
+          ss << "id = " << prev_id << " ; ";
+          ss << "volt = " << info_volt << " ; ";
+          ss << "fovea = " << info_fovea << " ; ";
+          ss << "wide = " << info_wide << " ;";
           std::cout << ss.str() << std::endl;
           if (out == nullptr) {
             out = new outfile::Item("data.txt");
             outfile::items.push_back(out);
           }
           *out->fs << ss.str() << std::endl;
-          std::cerr << LOGNAME " Captured: " << aruco_fovea.id << std::endl;
         }
+        info_fovea = "";
+        for (const auto &p : aruco_fovea.corners)
+          info_fovea += std::to_string(p.x) + "," + std::to_string(p.y) + " ";
+        info_volt = std::to_string(aruco_fovea.volt.x) + "," +
+                    std::to_string(aruco_fovea.volt.y);
         prev_id = aruco_fovea.id;
       };
     }
