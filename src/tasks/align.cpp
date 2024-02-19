@@ -13,9 +13,15 @@
 
 using namespace graphics;
 
-void draw_markers(cv::Mat &frame, cv::Scalar color) {
-  const int w = frame.cols, h = frame.rows, cx = w / 2, cy = h / 2, s = 100,
-            d = 250, t = 10;
+struct Shift {
+  int x, y;
+} wide_shift = {0, 0};
+
+void draw_markers(cv::Mat &frame, cv::Scalar color,
+                  struct Shift *shift = nullptr) {
+  const int w = frame.cols, h = frame.rows, s = 100, d = 160, t = 6;
+  const int cx = w / 2 + (shift != nullptr ? shift->x : 0),
+            cy = h / 2 + (shift != nullptr ? shift->y : 0);
   cv::drawMarker(frame, {cx - d, cy}, color, cv::MARKER_CROSS, s, t);
   cv::drawMarker(frame, {cx + d, cy}, color, cv::MARKER_CROSS, s, t);
   cv::drawMarker(frame, {cx, cy - d}, color, cv::MARKER_CROSS, s, t);
@@ -43,11 +49,14 @@ std::thread wide_renderer(Tile &tile, MatPipe &view_in, bool &zoom) {
           // Crop to center of the frame
           const int w = rint(frame->cols / s), h = rint(frame->rows / s);
           cv::Rect roi = {(frame->cols - w) / 2, (frame->rows - h) / 2, w, h};
+          roi.x += wide_shift.x;
+          roi.y += wide_shift.y;
           tile.use((*frame)(roi));
+          draw_markers(tile.mg, color::red());
         } else {
           tile.use(*frame);
+          draw_markers(tile.mg, color::red(), &wide_shift);
         }
-        draw_markers(tile.mg, color::red());
         tile.raster();
       }
     }
@@ -84,6 +93,14 @@ std::thread fovea_renderer(Tile &tile, FoveaPipe &view_in) {
 #undef LOGNAME
 #define LOGNAME "[task:align] "
 
+int norm(double val) {
+  int k = val < 0 ? -100 : 100;
+  val = std::abs(val);
+  if (val < 0.1)
+    return 0;
+  return k * (val - 0.1) / 0.4;
+}
+
 void tasks::align(Context &ctx) {
   auto &fb = *global::fb;
   Canvas canvas(fb.shape());
@@ -114,7 +131,12 @@ void tasks::align(Context &ctx) {
   x += btn_w;
   bool zoom = false;
   std::vector<Tile *> tiles = {
-      &wide_tile,
+      &wide_tile.use([](Tile &tile, bool) {
+        if (!tile.is_active())
+          return;
+        wide_shift.x = norm(tile.val.x - 0.5);
+        wide_shift.y = norm(tile.val.y - 0.5);
+      }),
       &fovea_tile,
       &back_btn,
       &zoom_btn.as(TileMode::BUTTON)
