@@ -25,7 +25,7 @@ void init(std::string task) {
   time(&currentTime);                // Get current time
   auto tm = localtime(&currentTime); // Convert current time to local time
   std::stringstream ss;
-  ss << std::put_time(tm, "%y%m%d-%H%M:%S-") << task << "-";
+  ss << std::put_time(tm, "%y%m%d-%H%M%S-") << task << "-";
   out_file_prefix = ss.str();
 };
 
