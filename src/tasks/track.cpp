@@ -10,6 +10,7 @@
 #include "GUI.h"
 #include "global.h"
 #include "tasks.h"
+#include "util/time.h"
 
 #include <calib/calib.h>
 #include <graphics/canvas.h>
@@ -26,11 +27,12 @@ typedef struct Tracker {
   cv::Rect roi;
   cv::Point2d mems_volt;
   std::mutex lock;
-  bool valid = false;
+  bool valid = false, updated = false;
   std::thread *thread = nullptr;
   void wait() {
     if (thread != nullptr) {
       valid = false;
+      updated = false;
       thread->join();
       delete thread;
       thread = nullptr;
@@ -42,6 +44,7 @@ typedef struct Tracker {
     center.y /= img.rows;
     auto volt = calib::cvt(calib::PtoV, center - calib::shift);
     mems_volt = {volt.x * 180.0 - 90.0, volt.y * 180.0 - 90.0};
+    updated = true;
   }
 } Tracker;
 
@@ -54,17 +57,16 @@ std::thread pos_watcher(Context &ctx, std::vector<Tracker *> &trackers) {
     try {
       auto wide = ctx.cap_wide.read();
       while (!global::flag_term) {
-        ctx.cap_wide.next(wide, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         for (auto &tracker : trackers) {
-          if (!tracker->valid)
+          if (!(tracker->valid && tracker->updated))
             continue;
-          std::lock_guard lock(tracker->lock);
-          const auto &volt = tracker->mems_volt;
+          std::unique_lock lock(tracker->lock);
+          const auto volt = tracker->mems_volt;
+          lock.unlock();
           ctx.mems_pos.write({volt.x, volt.y, tracker->id});
+          while (!ctx.mems_pos.empty())
+            ctx.mems_pos.wait_read();
         }
-        while (!ctx.mems_pos.empty())
-          ctx.mems_pos.wait_read();
       }
     }
     EXPECT_END_OF_STREAM
@@ -89,14 +91,18 @@ void tracker(Context &ctx, Tracker &self) {
       cv::Mat img;
       cv::cvtColor(*frame, img, cv::COLOR_BGRA2BGR);
       tracker->init(*frame, self.roi);
+      auto t_start = Time::ms();
       while (!global::flag_term && self.valid) {
         ctx.cap_wide.next(frame, true);
         std::lock_guard lock(self.lock);
         cv::cvtColor(*frame, img, cv::COLOR_BGRA2BGR);
-        if (tracker->update(img, self.roi))
+        if (tracker->update(img, self.roi)) {
+          t_start = Time::ms();
           self.update_mems_pos(img);
-        else
-          break;
+        } else {
+          if (t_start + 1000 < Time::ms())
+            break;
+        }
       }
       self.valid = false;
       self.tile->style.normal.outline.weight = 0;
@@ -126,12 +132,65 @@ std::thread wide_renderer(MatPipe &mat_pipe, Tile &tile,
             continue;
           try {
             const auto &roi = tracker->roi;
+            cv::Point2d pos = (roi.tl() + roi.br()) / 2.0;
+            pos.x /= disp.cols;
+            pos.y /= disp.rows;
+            auto box =
+                calib::roi(pos, frame->size(), global::config.lens.scale);
+            box.x -= 2;
+            box.y -= 2;
+            box.width += 4;
+            box.height += 4;
             const auto &color = tracker->tile->style.normal.outline.color;
-            cv::rectangle(disp, roi, color, 4);
+            cv::rectangle(disp, roi, color, 1);
+            cv::rectangle(disp, box, color, 4);
           }
           CATCH_ASSERT(LOGNAME);
         }
         tile.use(disp).raster();
+      }
+    }
+    EXPECT_END_OF_STREAM
+    CATCH_ASSERT(LOGNAME);
+    mat_pipe.close();
+    std::cerr << LOGNAME "terminated." << std::endl;
+  });
+}
+
+#undef LOGNAME
+#define LOGNAME "[task:track:match-renderer] "
+
+std::thread match_renderer(Tile &tile, MatPipe &mat_pipe, Tracker *tracker) {
+  return std::thread([&, tracker]() {
+    const std::string name = "W" + std::to_string((unsigned)(tracker->id));
+    std::cerr << LOGNAME << "started " << name << std::endl;
+    tile.auto_raster = false;
+    tile.style.text.color = color::mono(1.0, 0.4);
+    try {
+      auto frame = mat_pipe.read();
+      bool flag_reset = false;
+      while (!global::flag_term) {
+        mat_pipe.next(frame, true);
+        if (tracker->valid) {
+          const auto &roi = tracker->roi;
+          cv::Point2d pos = (roi.tl() + roi.br()) / 2.0;
+          pos.x /= frame->cols;
+          pos.y /= frame->rows;
+          const auto box =
+              calib::roi(pos, frame->size(), global::config.lens.scale);
+          if (flag_reset) {
+            tile.style.normal.outline.color =
+                color::hsla(tracker->id / 3.0, 1.0, 0.5);
+            tile.text("");
+            flag_reset = false;
+          }
+          tile.use((*frame)(box)).raster();
+        } else if (!flag_reset) {
+          tile.use(cv::Mat());
+          tile.style.normal.outline.color = color::mono(0);
+          tile.text(name).raster();
+          flag_reset = true;
+        }
       }
     }
     EXPECT_END_OF_STREAM
@@ -151,7 +210,7 @@ std::thread fovea_renderer(FoveaPipe &fovea_pipe,
     auto &tile = *tracker->tile;
     tile.auto_raster = false;
     tile.style.text.color = color::mono(1.0, 0.4);
-    tile.style.normal.outline.color = color::hsla(n++ / 6.0, 1.0, 0.5);
+    tile.style.normal.outline.color = color::hsla(n++ / 3.0, 1.0, 0.5);
     tile.text(tracker->name).raster();
   }
   return std::thread([&]() {
@@ -196,27 +255,36 @@ void tasks::track(Context &ctx) {
   x = 0;
   y = 0;
   // Tiles - row 1
-  Tile tile_a(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_w1(cv::Rect{x, y, w / 3, img_h1}, pad);
   x += w / 3;
-  Tile tile_b(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_w2(cv::Rect{x, y, w / 3, img_h1}, pad);
   x += w / 3;
-  Tile tile_c(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_w3(cv::Rect{x, y, w / 3, img_h1}, pad);
   // Tiles - row 2
   x = 0;
   y += img_h1;
-  Tile tile_d(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_t1(cv::Rect{x, y, w / 3, img_h1}, pad);
   x += w / 3;
-  Tile tile_e(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_t2(cv::Rect{x, y, w / 3, img_h1}, pad);
   x += w / 3;
-  Tile tile_f(cv::Rect{x, y, w / 3, img_h1}, pad);
+  Tile tile_t3(cv::Rect{x, y, w / 3, img_h1}, pad);
   // List of all tiles
   std::vector<Tracker *> trackers;
-  trackers.push_back(new Tracker{1, "A", &tile_a});
-  trackers.push_back(new Tracker{2, "B", &tile_b});
-  trackers.push_back(new Tracker{3, "C", &tile_c});
-  trackers.push_back(new Tracker{4, "D", &tile_d});
-  trackers.push_back(new Tracker{5, "E", &tile_e});
-  trackers.push_back(new Tracker{6, "F", &tile_f});
+  trackers.push_back(new Tracker{1, "T1", &tile_t1});
+  trackers.push_back(new Tracker{2, "T2", &tile_t2});
+  trackers.push_back(new Tracker{3, "T3", &tile_t3});
+  threads.push_back({
+      "task/track/match-renderer",
+      match_renderer(tile_w1, ctx.cap_wide, trackers[0]),
+  });
+  threads.push_back({
+      "task/track/match-renderer",
+      match_renderer(tile_w2, ctx.cap_wide, trackers[1]),
+  });
+  threads.push_back({
+      "task/track/match-renderer",
+      match_renderer(tile_w3, ctx.cap_wide, trackers[2]),
+  });
   threads.push_back({
       "task/track/pos-watcher",
       pos_watcher(ctx, trackers),
@@ -244,35 +312,23 @@ void tasks::track(Context &ctx) {
   notes.style.bg = color::mono(0.0);
   Tracker *preview = nullptr;
   std::vector<Tile *> tiles = {
-      &tile_a.use([&trackers](Tile &tile, bool state_change) {
+      &tile_w1,
+      &tile_w2,
+      &tile_w3,
+      &tile_t1.use([&trackers](Tile &tile, bool state_change) {
         if (state_change && !tile.is_active())
           trackers[0]->wait();
         trackers[0]->tile->use(cv::Mat());
       }),
-      &tile_b.use([&trackers](Tile &tile, bool state_change) {
+      &tile_t2.use([&trackers](Tile &tile, bool state_change) {
         if (state_change && !tile.is_active())
           trackers[1]->wait();
         trackers[1]->tile->use(cv::Mat());
       }),
-      &tile_c.use([&trackers](Tile &tile, bool state_change) {
+      &tile_t3.use([&trackers](Tile &tile, bool state_change) {
         if (state_change && !tile.is_active())
           trackers[2]->wait();
         trackers[2]->tile->use(cv::Mat());
-      }),
-      &tile_d.use([&trackers](Tile &tile, bool state_change) {
-        if (state_change && !tile.is_active())
-          trackers[3]->wait();
-        trackers[3]->tile->use(cv::Mat());
-      }),
-      &tile_e.use([&trackers](Tile &tile, bool state_change) {
-        if (state_change && !tile.is_active())
-          trackers[4]->wait();
-        trackers[4]->tile->use(cv::Mat());
-      }),
-      &tile_f.use([&trackers](Tile &tile, bool state_change) {
-        if (state_change && !tile.is_active())
-          trackers[5]->wait();
-        trackers[5]->tile->use(cv::Mat());
       }),
       &tile_wide.use([&](Tile &tile, bool state_change) {
         auto wide = ctx.cap_wide.read();
@@ -303,8 +359,13 @@ void tasks::track(Context &ctx) {
         auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
         {
           std::lock_guard lock(preview->lock);
-          preview->roi =
-              calib::roi(pos, wide->size(), global::config.lens.scale);
+          auto s = wide->size();
+          double x = std::min(s.width, s.height) / global::config.lens.scale;
+          s.width = s.height = static_cast<int>(x * 0.75);
+          cv::Point2d tl = cv::Point2d{pos.x * wide->cols, pos.y * wide->rows} -
+                           cv::Point2d(s.width, s.height) / 2.0;
+          preview->roi = cv::Rect{static_cast<int>(tl.x),
+                                  static_cast<int>(tl.y), s.width, s.height};
           preview->update_mems_pos(*wide);
           preview->valid = true;
         }
