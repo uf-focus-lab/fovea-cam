@@ -5,7 +5,7 @@
 #include "fcmp/fcmp.h"
 #include "threading/exception.h"
 #include "util/assert.h"
-#include "util/fmt.h"
+// #include "util/fmt.h"
 
 #include <condition_variable>
 #include <iostream>
@@ -91,14 +91,17 @@ std::thread threads::mems_tx(Context &ctx) {
       while (!global::flag_term) {
         // Get next target position
         auto pos = pos_in.read();
+        // Remap axises according to physical device
+        const auto x = -pos.y, y = pos.x;
         // Compute voltages
-        compute_channels(pos.x, pos.field.ch[0], pos.field.ch[1]);
-        compute_channels(pos.y, pos.field.ch[2], pos.field.ch[3]);
+        compute_channels(x, pos.field.ch[0], pos.field.ch[1]);
+        compute_channels(y, pos.field.ch[2], pos.field.ch[3]);
         // Send position until ACK
         bool flag_next = false;
         while (!flag_next && !global::flag_term) {
           // std::cerr << LOGNAME "Move to (" << fmt(pos.x, 2, 2) << ", "
-          //           << fmt(pos.y, 2, 2) << ") @" << pos.field.tag << std::endl;
+          //           << fmt(pos.y, 2, 2) << ") @" << pos.field.tag <<
+          //           std::endl;
           // Send frame
           SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_POS, pos.field);
           // Check for ACK
@@ -222,10 +225,11 @@ std::thread threads::mems_rx(Context &ctx) {
               }
               // Handle ACK:POS
               const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
-              next_pos = mems::Position(
-                  ANALOG_VOLTAGE(pos->ch[0]) - ANALOG_VOLTAGE(pos->ch[1]),
-                  ANALOG_VOLTAGE(pos->ch[2]) - ANALOG_VOLTAGE(pos->ch[3]),
-                  pos->tag);
+              auto const ch_a = ANALOG_VOLTAGE(pos->ch[0]) -
+                                ANALOG_VOLTAGE(pos->ch[1]),
+                         ch_b = ANALOG_VOLTAGE(pos->ch[2]) -
+                                ANALOG_VOLTAGE(pos->ch[3]);
+              next_pos = mems::Position(ch_b, -ch_a, pos->tag);
               // Update synchronization window
               current_sync = current_sync->conclude(next_pos);
               sync_out.write(current_sync);
