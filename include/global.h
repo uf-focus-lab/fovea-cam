@@ -63,10 +63,11 @@ extern Spinnaker::CameraPtr wide_camera, fovea_camera;
 void init_devices();
 void deinit_devices();
 
-typedef struct {
+typedef struct Fovea {
   std::uint16_t tag;
   double x, y;
   const cv::Mat mat;
+  cv::Point2d volt() const { return {x / 180.0 + 0.5, y / 180.0 + 0.5}; }
 } Fovea;
 
 typedef struct {

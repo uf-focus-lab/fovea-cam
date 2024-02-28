@@ -19,7 +19,7 @@ public:
   void flush();
   void use(void *buffer);
   bool is_open();
-  PointerEvent wait_pointer(bool block = true);
+  PointerEvent wait_pointer(int timeout_ms = 16);
 };
 
 } // namespace graphics

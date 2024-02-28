@@ -14,8 +14,6 @@
 int run_task(const std::string task) {
   // Initialize outfile prefix
   outfile::init(task);
-  // Initialize devices
-  global::init_devices();
   // Create general pipes
   Context ctx;
   // General threads
@@ -30,13 +28,26 @@ int run_task(const std::string task) {
     tasks::tune(ctx);
   else if (task == "align")
     tasks::align(ctx);
+  else if (task == "checker")
+    tasks::checker(ctx);
   else if (task == "aruco")
     tasks::aruco(ctx);
   else if (task == "match")
     tasks::match(ctx);
   else if (task == "track")
     tasks::track(ctx);
-  else {
+  else if (task == "stabilize")
+    tasks::stabilize(ctx);
+  else if (task == "test-outfile") {
+    for (int i = 1; i < 20; i++) {
+      outfile::Item *item =
+          new outfile::Item("hello" + std::to_string(i) + ".txt");
+      outfile::items.push_back(item);
+      *item->fs << "Hello, world " << i << " !" << std::endl;
+    }
+    global::flag_term = true;
+    global::flag_back = true;
+  } else {
     std::cerr << "[main] Unknown task: " << task << std::endl;
     global::flag_term = true;
     global::flag_back = true;
@@ -66,7 +77,9 @@ int main(const int argc, const char **argv) {
   global::init_signal();
   global::load_config();
   global::init_display();
-  int ret_val = 0;
+  // Initialize devices
+  global::init_devices();
+  int ret_val;
   if (argc < 2)
     ret_val = kiosk();
   else

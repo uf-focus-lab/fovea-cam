@@ -1,6 +1,5 @@
 #include <opencv2/opencv.hpp>
 #include <stdint.h>
-#include <string>
 #include <sys/types.h>
 #include <vector>
 
@@ -60,8 +59,8 @@ public:
   // Specify a region on display to project to
   Canvas &show(const cv::Mat &, cv::Rect, int transform = transform::NONE);
   // Shortcut to show tile(s)
-  Canvas &show(Tile &, int transform = transform::NONE);
-  Canvas &show(std::vector<Tile *> &, int transform = transform::NONE);
+  Canvas &show(Tile &, bool force = false, int transform = transform::NONE);
+  Canvas &show(std::vector<Tile *> &, bool force = false, int transform = transform::NONE);
   // Render to internal buffer without any transformation
   Canvas &render(const cv::Mat &, cv::Point pos = {0, 0},
                  int transform = transform::NONE);

@@ -11,7 +11,7 @@ struct TileReadOut {
 
 namespace graphics {
 
-typedef enum TileMode { GENERIC, BUTTON, X_SLIDER, Y_SLIDER } TileMode;
+typedef enum TileMode { INACTIVE, GENERIC, BUTTON, X_SLIDER, Y_SLIDER } TileMode;
 typedef enum Align {
   // Horizontal components
   __HL__ = 0b100000,
@@ -90,9 +90,9 @@ protected:
   // Read out the canvas and set readout flag.
   // Returns true if new data is available for read, otherwise false;
   std::shared_ptr<const TileReadOut> buffer = nullptr;
-  std::shared_ptr<const TileReadOut> read(bool once = true);
 
 public:
+  std::shared_ptr<const TileReadOut> read(bool once = true);
   Tile(cv::Rect bbox, int pad = 0, TileMode mode = TileMode::GENERIC);
   TileMode mode = TileMode::GENERIC;
   Tile &as(TileMode mode);

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+for file in "$@"
+do
+  # Check for suffix
+  if [[ $file != *.avi ]]
+  then
+    echo "$avi not eligilible for conversion, skipping..."
+    continue
+  fi
+  # Rename and check if destination file exists
+  OUTFILE="${file%.avi}.mp4"
+  if [ -f "$OUTFILE" ]
+  then
+    echo "$OUTFILE already exists. Skipping."
+    continue
+  fi
+  echo "==============================="
+  echo Converting \""${file%.avi}"\"
+  echo "==============================="
+  # Convert
+  ffmpeg -i "$file" -c:v libx264 -b:v 10M -an "$OUTFILE"
+  echo
+done

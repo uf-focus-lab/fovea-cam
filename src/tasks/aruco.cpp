@@ -288,7 +288,7 @@ std::thread aruco_locator(FoveaPipe &fovea_in, ArUcoPipe &aruco_out,
       auto fovea = fovea_in.read();
       while (!global::flag_term) {
         fovea_in.next(fovea, true);
-        cv::Point2d volt = {fovea->x, fovea->y};
+        auto volt = fovea->volt();
         auto view =
             find_aruco(aruco_out, fovea->mat, volt, transform, view_transform);
         view_out.write({
@@ -445,7 +445,7 @@ void tasks::aruco(Context &ctx) {
   // Render loop
   try {
     while (!global::flag_term) {
-      auto pos = fb.wait_pointer(false);
+      auto pos = fb.wait_pointer();
       for (auto &el : tiles)
         el->handle(pos);
       canvas.show(tiles).apply(fb, &pos);

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <thread>
 #include <unistd.h>
 
 #include <X11/Xlib.h>
@@ -89,8 +90,9 @@ public:
     open = true;
   };
 
-  graphics::PointerEvent wait_pointer(bool block) {
-    if (!block && !XEventsQueued(display, QueuedAfterFlush)) {
+  graphics::PointerEvent wait_pointer(int timeout_ms) {
+    auto time_start = std::chrono::high_resolution_clock::now();
+    if (timeout_ms <= 0 && !XEventsQueued(display, QueuedAfterFlush)) {
       return graphics::PointerEvent({false});
     }
     static XEvent e;
@@ -98,7 +100,18 @@ public:
     bool flag_return = false;
     // Find the LAST event that needs to be processed, skip move events for
     // faster response
-    while (!flag_return && XEventsQueued(display, QueuedAfterFlush)) {
+    while (!flag_return) {
+      while (XEventsQueued(display, QueuedAfterFlush) == 0) {
+        // break condition 1: non-block query with no events in the queue
+        if (pe.valid)
+          return pe;
+        // break condition 2: a valid event has already been found
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - time_start);
+        if (timeout_ms >= 0 && duration.count() > timeout_ms)
+          return pe;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
       XNextEvent(display, &e); // This is always blocking
       switch (e.type) {
       case MotionNotify:
@@ -170,8 +183,8 @@ bool X11FB::is_open() { return ((IMPL *)impl)->is_open(); }
 
 unsigned char *X11FB::buffer() { return ((IMPL *)impl)->buffer(); }
 
-PointerEvent X11FB::wait_pointer(bool block) {
-  return ((IMPL *)impl)->wait_pointer(block);
+PointerEvent X11FB::wait_pointer(int timeout_ms) {
+  return ((IMPL *)impl)->wait_pointer(timeout_ms);
 }
 
 static const char *const argv_dmps[] = {"xset", "-dpms", NULL};

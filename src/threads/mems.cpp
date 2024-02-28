@@ -81,13 +81,14 @@ std::thread threads::mems_tx(Context &ctx) {
     SET_BIT(fcmp_config, FCMP_CFG_BIT_LPF);
     // Setup MEMS driver
     SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-    // Wait for a while before pushing position
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Wait a while before pushing position
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
     SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
     SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
     // Infinite loop until closed
     try {
+      static uint8_t prev_tag = 255;
       while (!global::flag_term) {
         // Get next target position
         auto pos = pos_in.read();
@@ -96,6 +97,21 @@ std::thread threads::mems_tx(Context &ctx) {
         // Compute voltages
         compute_channels(x, pos.field.ch[0], pos.field.ch[1]);
         compute_channels(y, pos.field.ch[2], pos.field.ch[3]);
+        // Check for tag change
+        if (pos.field.tag != prev_tag) {
+          if (prev_tag == 255) {
+            // Resume to strobe sync mode
+            SET_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+            SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          } else if (pos.field.tag == 255) {
+            // Disable strobe sync mode
+            CLR_BIT(fcmp_config, FCMP_CFG_BIT_STROBE_SYNC);
+            SEND_TO_MEMS(device, FCMP_METHOD_SET | FCMP_FIELD_CFG, fcmp_config);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+          }
+        }
+        prev_tag = pos.field.tag;
         // Send position until ACK
         bool flag_next = false;
         while (!flag_next && !global::flag_term) {
@@ -232,6 +248,9 @@ std::thread threads::mems_rx(Context &ctx) {
               next_pos = mems::Position(ch_b, -ch_a, pos->tag);
               // Update synchronization window
               current_sync = current_sync->conclude(next_pos);
+              // Flush sync pipe if tag == 255 to prevent memory overflow
+              if (current_sync->tag() == 255)
+                sync_out.flush();
               sync_out.write(current_sync);
               { // Update acknowledge count
                 std::lock_guard<std::mutex> lock(self.mutex);

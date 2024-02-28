@@ -193,16 +193,16 @@ Canvas &Canvas::show(const cv::Mat &src, cv::Rect tile, int transform) {
   return *this;
 }
 
-Canvas &Canvas::show(Tile &tile, int transform) {
-  auto readout = tile.read();
+Canvas &Canvas::show(Tile &tile, bool force, int transform) {
+  auto readout = tile.read(!force);
   if (readout != nullptr)
     render(readout->mat, {readout->bbox.x, readout->bbox.y}, transform);
   return *this;
 }
 
-Canvas &Canvas::show(std::vector<Tile *> &tiles, int transform) {
+Canvas &Canvas::show(std::vector<Tile *> &tiles, bool force, int transform) {
   for (auto tile : tiles)
-    show(*tile, transform);
+    show(*tile, force, transform);
   return *this;
 }
 

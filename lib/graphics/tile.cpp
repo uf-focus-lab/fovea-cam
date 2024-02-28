@@ -162,6 +162,7 @@ std::shared_ptr<const TileReadOut> Tile::read(bool once) {
 Tile &Tile::raster() {
   if (!updated)
     return *this;
+  // Prepare rendering canvas
   cv::Mat mat = cv::Mat(cv::Size{bbox.width, bbox.height}, CV_8UC4,
                         color::mono(0.0, 0.0));
   // 1. Render outline onto canvas
@@ -285,7 +286,7 @@ Tile &Tile::text(std::string text) {
 }
 
 bool Tile::handle(PointerEvent pos) {
-  if (!pos.valid)
+  if (!pos.valid || mode == TileMode::INACTIVE)
     return false;
   const bool _active = active;
   if (pos.is_updated(1) && pos.is_down(1))

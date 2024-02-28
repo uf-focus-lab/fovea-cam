@@ -30,7 +30,7 @@ std::thread matcher(Context &ctx, Tile &tile,
         // std::cerr << LOGNAME "FOVEA: (" << fmt(fovea->x, 2, 2) << ", "
         //           << fmt(fovea->y, 2, 2) << ") @" << fovea->tag << std::endl;
         // Convert volt range from [-90, 90] to [0, 1]
-        cv::Point2d volt = {fovea->x / 180.0 + 0.5, fovea->y / 180.0 + 0.5};
+        cv::Point2d volt = fovea->volt();
         auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
         // Get latest wide frame
         auto wide = ctx.cap_wide.read();
@@ -76,7 +76,7 @@ void calibrator(Context &ctx) {
         return;
       }
       const double scale = 1.0 / global::config.lens.scale;
-      cv::Point2d volt = {fovea->x / 180.0 + 0.5, fovea->y / 180.0 + 0.5};
+      cv::Point2d volt = fovea->volt();
       auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
       cv::Mat canvas, kernel;
       // Step 1: scale down the fovea to match dpi with wide
@@ -215,7 +215,7 @@ void tasks::match(Context &ctx) {
   // Render loop
   try {
     while (!global::flag_term) {
-      auto pos = fb.wait_pointer(false);
+      auto pos = fb.wait_pointer();
       for (auto &el : tiles)
         el->handle(pos);
       if (calibrator_state == STATE_DONE) {

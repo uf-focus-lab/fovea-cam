@@ -29,32 +29,31 @@ int kiosk() {
   Canvas canvas(fb.shape());
   // Prepare tiles for interaction
   const int w = fb.shape().width, pad = w / 64;
-  const int btn_h = w / 8, btn_w = w / 4;
+  const int btn_h = w / 8, btn_w4 = w / 4, btn_w3 = w / 3;
   int x, y = fb.shape().height - 3 * btn_h;
   // Tile for splash image
   const cv::Mat splash_mat(SPLASH_PNG_H, SPLASH_PNG_W, CV_8UC4,
                            (char *)SPLASH_PNG_DATA);
   Tile splash({0, 0, w, y}, 2 * pad);
   splash.style.bg = color::mono(0);
-
   // ======================== Calibration Tasks ========================
-  x = 0;
   y += btn_h;
-  Tile btn_tune(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
-  x += btn_w;
-  Tile btn_align(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
-  x += btn_w;
-  Tile btn_calib(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
-  x += btn_w;
-  Tile btn_match(cv::Rect{x, y, btn_w, btn_h}, pad, TileMode::BUTTON);
-
+  x = 0;
+  Tile btn_tune(cv::Rect{x, y, btn_w4, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w4;
+  Tile btn_align(cv::Rect{x, y, btn_w4, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w4;
+  Tile btn_checker(cv::Rect{x, y, btn_w4, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w4;
+  Tile btn_calib(cv::Rect{x, y, btn_w4, btn_h}, pad, TileMode::BUTTON);
   // ======================== Application Tasks ========================
-  x = 0;
   y += btn_h;
-  Tile btn_tracking(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
-  x += 2 * btn_w;
-  Tile btn_stabilize(cv::Rect{x, y, 2 * btn_w, btn_h}, pad, TileMode::BUTTON);
-
+  x = 0;
+  Tile btn_match(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w3;
+  Tile btn_tracking(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
+  x += btn_w3;
+  Tile btn_stabilize(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
   // Enter event loop
   std::string task = "";
   std::vector<Tile *> tiles = {
@@ -64,6 +63,9 @@ int kiosk() {
       &btn_align
            .text("Align") //
            .use([&task](Tile &, bool) { task = "align"; }),
+      &btn_checker
+           .text("Checker") //
+           .use([&task](Tile &, bool) { task = "checker"; }),
       &btn_calib
            .text("ArUco") //
            .use([&task](Tile &, bool) { task = "aruco"; }),
@@ -81,7 +83,7 @@ int kiosk() {
 
   std::cerr << LOG_NAME "Start interaction" << std::endl;
   while (!global::flag_term) {
-    const auto pos = fb.wait_pointer(true);
+    const auto pos = fb.wait_pointer();
     // Check for corresponding tile
     for (auto tile : tiles)
       tile->handle(pos);

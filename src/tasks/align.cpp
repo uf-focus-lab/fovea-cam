@@ -160,7 +160,7 @@ void tasks::align(Context &ctx) {
   try {
     ctx.mems_pos.flush().write({0.0, 0.0});
     while (!global::flag_term) {
-      auto pos = fb.wait_pointer(false);
+      auto pos = fb.wait_pointer();
       for (auto &el : tiles)
         el->handle(pos);
       canvas.show(tiles).apply(fb, &pos);

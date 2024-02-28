@@ -29,7 +29,7 @@ private:
 public:
   Position position;
   long delay;
-  SyncWindow(Position pos = Position(0, 0, 0), long delay = 1000 /* us */);
+  SyncWindow(Position pos = Position(0, 0, 0), long delay = 0 /* us */);
   // Called by mems recv upon arrival of next sync window.
   std::shared_ptr<SyncWindow> conclude(Position next);
   // Getter of the tag for this window

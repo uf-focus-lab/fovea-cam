@@ -348,7 +348,7 @@ void tasks::tune(Context &ctx) {
   // Render loop
   try {
     while (!global::flag_term) {
-      auto pos = fb.wait_pointer(true);
+      auto pos = fb.wait_pointer();
       for (auto &tile : tiles)
         tile->handle(pos);
       canvas.show(tiles).apply(fb, &pos);
