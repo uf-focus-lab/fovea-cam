@@ -11,11 +11,11 @@ hero:
     alt: FoveaCamPlus-FrontView
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: Publicaton
+      link: /publication/index
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Build Your Own
+      link: /build-your-own/index
 
 features:
   - title: Feature A
