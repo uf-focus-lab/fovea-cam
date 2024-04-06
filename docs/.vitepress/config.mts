@@ -13,64 +13,60 @@ export default defineConfig({
         text: 'Build Your Own',
         items: [
           { text: 'Overview', link: '/build-your-own/index' },
-          { text: 'Prerequisites', link: '/item-2' },
-          { text: 'Building Hardware', link: '/item-3' },
-          { text: 'Preparing Software', link: '/item-3' },
-          { text: 'Calibration', link: '/item-3' },
-          { text: 'Field Operation', link: '/item-3' }
+          { text: 'Prerequisites', link: '/build-your-own/prereq' },
+          { text: 'Sourcing Hardware', link: '/build-your-own/parts' },
+          { text: 'Assembly', link: '/build-your-own/together' },
+          { text: 'Preparing Software', link: '/build-your-own/install' },
+          { text: 'Calibration', link: '/build-your-own/calibrate' },
+          { text: 'Field Operation', link: '/build-your-own/field' }
         ]
       }
     ],
     sidebar: {
       "/build-your-own/": [
         {
-          text: "Overview",
+          text: "Introduction",
           items: [
-            { text: "Markdown Examples", link: "/placeholder" },
-            { text: "Runtime API Examples", link: "/placeholder" },
+            { text: "Overview", link: "/build-your-own/index" }
           ],
         },
         {
           text: "Prerequisites",
           items: [
-            { text: "Markdown Examples", link: "/placeholder" },
-            { text: "Runtime API Examples", link: "/placeholder" },
+            { text: "Prerequisites Overview", link: "/build-your-own/prereq" }
           ],
         },
         {
           text: "Building Hardware",
           items: [
             // Items to be purchased & 3D printed
-            { text: "Sourcing Parts", link: "/placeholder" },
+            { text: "Sourcing Parts", link: "/build-your-own/parts" },
             // How to assemble the parts
-            { text: "Putting Together the Camera", link: "/placeholder" },
+            { text: "Putting Together the Camera", link: "/build-your-own/together" },
           ],
         },
         {
           text: "Preparing Software",
           items: [
-            { text: "Markdown Examples", link: "/placeholder" },
-            { text: "Runtime API Examples", link: "/placeholder" },
+            { text: "Installation", link: "/build-your-own/install" }
           ],
         },
         {
           text: "Calibration",
           items: [
-            { text: "Markdown Examples", link: "/placeholder" },
-            { text: "Runtime API Examples", link: "/placeholder" },
+            { text: "How to Calibrate", link: "/build-your-own/calibrate" }
           ],
         },
         {
-          text: "Field Operation",
+          text: "Operation",
           items: [
-            { text: "Markdown Examples", link: "/placeholder" },
-            { text: "Runtime API Examples", link: "/placeholder" },
+            { text: "Field Operation", link: "/build-your-own/field" }
           ],
         },
       ],
     },
-    socialLinks: [
-      { icon: "github", link: "https://github.com/vuejs/vitepress" },
-    ],
+    //socialLinks: [
+      //{ icon: "github", link: "" },
+    //],
   },
 });
