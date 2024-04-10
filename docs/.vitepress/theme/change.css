@@ -1,0 +1,6 @@
+/* .vitepress/theme/custom.css */
+
+.VPHero .image {
+  max-width: 600px;
+  max-height: 600px;
+}
