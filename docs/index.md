@@ -7,7 +7,7 @@ hero:
   text: "Awesome Device!"
   tagline: My great project tagline
   image:
-    src: /res/cover-img.png
+    src: /res/FrontViewHDR.png
     alt: FoveaCamPlus-FrontView
   actions:
     - theme: brand
