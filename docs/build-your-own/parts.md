@@ -8,7 +8,7 @@
 - MEMS lens
 - 3D Printed Parts
 
-## 3D Printed Parts
+# 3D Printed Parts
 
         The frame of the foveaCam++ that holds together the components is 3D printed
 
@@ -17,13 +17,13 @@
         All the printed parts have 100% infill
         Supports / scaffolding should also be used when printing
 
-## Main Case
+### Main Case
 <img src="/res/case_graphic.png" alt="case" width="400"/>
 
         The main case is what attachs to the lens
         
 
-## Optic Kit
+### Optic Kit
 
     The optic kit is made up of 6 parts
     - Optic case
@@ -33,13 +33,31 @@
     - Aperture ring
     - Beam spliter clamp
 
-## The Optic Base
+### The Optic Base
 <img src="/res/OpticBase.png" alt="optic base" width="400"/>
 
         The optic base is what connects the main case, lens, and the optic kit together
 
-## The Aperture Ring
+### The Aperture Ring
 <img src="/res/ApertureRing4.png" alt="Aperture Ring" width="1000"/>
 
         The aperture ring consists of two parts, an inside and an outside ring
         If both rings are printed correctly then the entire ring should lock in place and should not move.
+
+
+# Other Parts
+
+
+
+### The Aperture
+
+The camera aperature used for this device can be found at the following link:
+https://a.co/d/gAZrS8o
+
+
+### Electronics Components
+
+
+### Screws
+Throughout the assembly of the device, screws with the following sizes are needed:
+- M2*6
