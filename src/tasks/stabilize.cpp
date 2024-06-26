@@ -100,6 +100,7 @@ std::thread tracker(Context &ctx, DispatchCmd &cmd, double &advance,
     std::cerr << LOGNAME << "started." << std::endl;
     auto out_item = new outfile::Item("trajectory.csv");
     outfile::items.push_back(out_item);
+    out_item->keep = false;
     auto &out = *out_item->fs;
     out << "     t     ,"
            "   Cx   ,   Cy   ,"
@@ -205,7 +206,7 @@ std::thread wide_renderer(Context &ctx, Tile &tile, DispatchCmd &user,
               cv::rectangle(disp, roi, color::blue(), 4);
             }
             if (tracker.active) {
-              auto &A = center_raw, B = center_pred * 2 - A;
+              auto &A = center_raw, B = A + velocity * 200;
               cv::drawMarker(disp, A, color::red(), cv::MARKER_SQUARE, 12, 12);
               cv::circle(disp, B, 12, color::red(), -1);
               cv::line(disp, A, B, color::yellow(), 4);

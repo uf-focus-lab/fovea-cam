@@ -43,6 +43,8 @@ void configure(const Spinnaker::CameraPtr &camera,
             << std::endl;
   { // Camera parameters
     auto map = Spinnaker::ConfigurableMap(camera->GetNodeMap());
+    // Enable chunk mode
+    map.set("ChunkModeActive", true);
     // Disable trigger input
     map.set("TriggerMode", "Off");
     // Enable strobe output on line3 (zoom camera only)

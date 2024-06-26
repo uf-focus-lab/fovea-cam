@@ -6,17 +6,19 @@ DEPS += $(wildcard **/*.hpp)
 MAKE := make --no-print-directory
 # CMake Build Directory and Build Type
 CMAKE_BUILD_TYPE ?= Unknown
+# Build Products
+# BIN := FoveaCam
 
 release: CMAKE_BUILD_TYPE := Release
 debug: CMAKE_BUILD_TYPE := Debug
 
 release debug:
-	$(eval BUILD_DIR := build/$@/)
+	$(eval BUILD_DIR := build/$@)
 	@ cd assets && $(MAKE) -j$(shell nproc --all)
 	@ $(MAKE) $(BUILD_DIR)/Makefile CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
 	@ cd $(BUILD_DIR)/.. && ln -sf $@/compile_commands.json .
-	@ cd $(BUILD_DIR) && $(MAKE) -j$(shell nproc --all) && ln -sf ./FoveaCam ../
-	@ cd $(BUILD_DIR)/.. && ln -sf $@/FoveaCam .
+	@ cd $(BUILD_DIR) && $(MAKE) -j$(shell nproc --all)
+	@ cp $(BUILD_DIR)/FoveaCam $(BUILD_DIR)/../
 
 build/%/Makefile: CMakeLists.txt
 	$(eval BUILD_DIR := $(shell dirname $@))
@@ -34,6 +36,11 @@ init:
 	sudo systemctl daemon-reload
 	sudo systemctl enable Xorg.service
 	sudo systemctl restart Xorg.service
+
+	sudo ln -sf $(PWD)/scripts/RTMP.service /etc/systemd/system/RTMP.service
+	sudo systemctl enable RTMP.service
+	sudo systemctl restart RTMP.service
+
 	sudo ln -sf $(PWD)/scripts/FoveaCam.service /etc/systemd/system/FoveaCam.service
 	sudo systemctl enable FoveaCam.service
 	sudo systemctl restart FoveaCam.service

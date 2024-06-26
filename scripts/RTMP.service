@@ -1,0 +1,15 @@
+[Unit]
+Description=RTMP Server at /live/livestream
+After=Xorg.service
+StartLimitIntervalSec=5
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+WorkingDirectory=/home/data
+ExecStart=docker run -p 1935:1935 -p 1985:1985 -p 8080:8080 -p 8000:8000/udp -p 10080:10080/udp ossrs/srs:5
+
+[Install]
+WantedBy=graphical.target
