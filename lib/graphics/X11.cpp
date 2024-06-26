@@ -1,11 +1,13 @@
 #include "X11.h"
 
 #include <X11/X.h>
+#include <cstddef>
 #include <cstring>
 #include <glob.h>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 
@@ -187,23 +189,24 @@ PointerEvent X11FB::wait_pointer(int timeout_ms) {
   return ((IMPL *)impl)->wait_pointer(timeout_ms);
 }
 
-static const char *const argv_dmps[] = {"xset", "-dpms", NULL};
-static const char *const argv_soff[] = {"xset", "s", "off", NULL};
-static const char *const argv_nblk[] = {"xset", "s", "noblank", NULL};
+void run_and_check(const char *cmd) {
+  if (system(cmd) == -1) {
+    if (cmd != nullptr) {
+      std::cout << LOG_NAME "Error executing command " << cmd << std::endl;
+    } else {
+      std::cout << LOG_NAME "Error checking system() command processor"
+                << std::endl;
+    }
+    perror("system");
+    exit(-1);
+  }
+}
 
-int xset() {
-  if (fork() == 0) {
-    execvp(argv_dmps[0], (char *const *)argv_dmps);
-    exit(0);
-  }
-  if (fork() == 0) {
-    execvp(argv_soff[0], (char *const *)argv_soff);
-    exit(0);
-  }
-  if (fork() == 0) {
-    execvp(argv_nblk[0], (char *const *)argv_nblk);
-    exit(0);
-  }
+int configure_x() {
+  run_and_check("xset -dpms");
+  run_and_check("xset s off");
+  run_and_check("xset s noblank");
+  run_and_check("xrandr -o left");
   return 0;
 }
 
@@ -226,7 +229,7 @@ int x11env() {
         std::cerr << LOG_NAME "Using DISPLAY :" << display_number << std::endl;
         setenv("DISPLAY", (":" + display_number).c_str(), 1);
         globfree(&glob_result);
-        return xset();
+        return configure_x();
       } else {
         std::cerr << LOG_NAME "Bad display path: " << file_path << std::endl;
       }
