@@ -51,7 +51,7 @@ int kiosk() {
   x = 0;
   Tile btn_match(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
   x += btn_w3;
-  Tile btn_tracking(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
+  Tile btn_track(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
   x += btn_w3;
   Tile btn_stabilize(cv::Rect{x, y, btn_w3, btn_h}, pad, TileMode::BUTTON);
   // Enter event loop
@@ -72,8 +72,8 @@ int kiosk() {
       &btn_match
            .text("Match") //
            .use([&task](Tile &, bool) { task = "match"; }),
-      &btn_tracking
-           .text("Tracking") //
+      &btn_track
+           .text("Track") //
            .use([&task](Tile &, bool) { task = "track"; }),
       &btn_stabilize
            .text("Stabilize") //

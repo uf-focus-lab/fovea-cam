@@ -1,20 +1,28 @@
 #include "calib.h"
 #include "util/clamp.h"
+#include <opencv2/core/types.hpp>
 
 using namespace calib;
 
-static const double K1 = 2.4;
-static const double C1 = 0.5 - 0.5 * K1;
+static const double K1 = 1.5;
 static const double K2 = 1.0 / K1;
-static const double C2 = 0.5 - 0.5 * K2;
 
 // Preloaded calibration coefficients
-Coeff calib::PtoV = {.X = {+0, K1, +0, C1}, .Y = {K1, -0, +0, C1}},
-      calib::VtoP = {.X = {+0, K2, +0, C2}, .Y = {K2, +0, +0, C2}};
+Coeff calib::PtoV = {.X = {-K1, 0, 0, 0}, .Y = {0, K1, 0, 0}},
+      calib::VtoP = {.X = {-K2, 0, 0, 0}, .Y = {0, K2, 0, 0}};
 
 cv::Point2d calib::shift = {0.0, 0.0};
 
-cv::Point2d calib::cvt(Coeff C, cv::Point2d p) {
+cv::Point2d calib::cvt(Coeff &C, cv::Point2d &p) {
+  double xy = p.x * p.y;
+  const auto &CX = C.X, &CY = C.Y;
+  return {
+      CX.x * p.x + CX.y * p.y + CX.xy * xy + CX.c,
+      CY.x * p.x + CY.y * p.y + CY.xy * xy + CY.c,
+  };
+}
+
+cv::Point2d calib::cvt(Coeff &C, cv::Point2d &&p) {
   double xy = p.x * p.y;
   const auto &CX = C.X, &CY = C.Y;
   return {
@@ -69,4 +77,20 @@ cv::Mat calib::view(const cv::Mat &src, const cv::Rect &roi) {
     src(bleed).copyTo(result(cv::Rect(offset, bleed.size())));
     return result;
   }
+}
+
+cv::Point2d calib::pos2volt(cv::Point2d pos) {
+  auto volt =
+      calib::cvt(calib::PtoV, 2 * (pos - cv::Point2d{0.5, 0.5} - calib::shift));
+  volt.x = clamp(volt.x, -1.0, +1.0);
+  volt.y = clamp(volt.y, -1.0, +1.0);
+  // std::cerr << "[calib] P " << pos << " >>> V " << volt << std::endl;
+  return volt;
+}
+
+cv::Point2d calib::volt2pos(cv::Point2d volt) {
+  auto pos = calib::cvt(calib::VtoP, volt) / 2.0 + cv::Point2d{0.5, 0.5} +
+             calib::shift;
+  // std::cerr << "[calib] P " << pos << " <<<< V " << volt << std::endl;
+  return pos;
 }

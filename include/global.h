@@ -69,7 +69,7 @@ typedef struct Fovea {
   std::uint16_t tag;
   double x, y;
   const cv::Mat mat;
-  cv::Point2d volt() const { return {x / 180.0 + 0.5, y / 180.0 + 0.5}; }
+  cv::Point2d volt() const { return {x, y}; }
 } Fovea;
 
 typedef struct {

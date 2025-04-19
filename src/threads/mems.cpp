@@ -1,10 +1,11 @@
-#include "mems/mems.h"
+#include "mems.h"
 #include "threads.h"
 
-#include "cobs/cobs.h"
-#include "fcmp/fcmp.h"
-#include "threading/exception.h"
-#include "util/assert.h"
+#include <cobs/cobs.h>
+#include <fcmp/fcmp.h>
+#include <mems/mems.h>
+#include <threading/exception.h>
+#include <util/assert.h>
 // #include "util/fmt.h"
 
 #include <condition_variable>
@@ -38,14 +39,12 @@ cobs_buffer_t cobs_rx, cobs_tx;
     SERIAL.write((uint8_t *)cobs_tx.data, cobs_tx.length + 1);                 \
   }
 
-#define MEMS_MAX_INPUT 65535.0 // Max Digital Input: 16-bit unsigned integer
-#define MEMS_MAX_VOLTAGE 200.0 // Max Analog Output: 200 Volts
-#define MEMS_MAX_V_DIFF 180.0  // Max Differential Voltage: 180 Volts
-#define DIGITAL_VOLTAGE(X)                                                     \
+  #define DIGITAL_VOLTAGE(X)                                                     \
   (uint16_t)(MEMS_MAX_INPUT * ((double)(X) / MEMS_MAX_VOLTAGE))
-#define ANALOG_VOLTAGE(X) (MEMS_MAX_VOLTAGE * ((double)(X) / MEMS_MAX_INPUT))
 
-static inline double clip(double min, double max, double val) {
+  #define ANALOG_VOLTAGE(X) (MEMS_MAX_VOLTAGE / MEMS_MAX_INPUT * (double)(X))
+
+static inline double clamp(double min, double max, double val) {
   if (val < min)
     return min;
   else if (val > max)
@@ -56,10 +55,10 @@ static inline double clip(double min, double max, double val) {
 
 static inline void compute_channels(double pos, uint16_t &ch1, uint16_t &ch2,
                                     double bias = (MEMS_MAX_V_DIFF / 2.0)) {
-  bias = clip(0.0, MEMS_MAX_VOLTAGE / 2.0, bias);
-  pos = clip(-MEMS_MAX_VOLTAGE, MEMS_MAX_VOLTAGE, pos);
+  bias = clamp(0.0, MEMS_MAX_VOLTAGE / 2.0, bias);
+  pos = clamp(-MEMS_MAX_V_DIFF, MEMS_MAX_V_DIFF, MEMS_MAX_V_DIFF * pos);
   // Normalized position within [-2bias, +2bias]
-  const double voltage_shift = clip(-bias, bias, pos / 2);
+  const double voltage_shift = clamp(-bias, bias, pos / 2);
   // Assign digitalized voltages for channels
   ch1 = DIGITAL_VOLTAGE(bias + voltage_shift);
   ch2 = DIGITAL_VOLTAGE(bias - voltage_shift);
@@ -93,7 +92,7 @@ std::thread threads::mems_tx(Context &ctx) {
         // Get next target position
         auto pos = pos_in.read();
         // Remap axises according to physical device
-        const auto x = -pos.y, y = pos.x;
+        const auto &x = pos.x, &y = pos.y;
         // Compute voltages
         compute_channels(x, pos.field.ch[0], pos.field.ch[1]);
         compute_channels(y, pos.field.ch[2], pos.field.ch[3]);
@@ -241,11 +240,11 @@ std::thread threads::mems_rx(Context &ctx) {
               }
               // Handle ACK:POS
               const fcmp_field_pos *pos = (const fcmp_field_pos *)frame->field;
-              auto const ch_a = ANALOG_VOLTAGE(pos->ch[0]) -
-                                ANALOG_VOLTAGE(pos->ch[1]),
-                         ch_b = ANALOG_VOLTAGE(pos->ch[2]) -
-                                ANALOG_VOLTAGE(pos->ch[3]);
-              next_pos = mems::Position(ch_b, -ch_a, pos->tag);
+              auto const vx = ANALOG_VOLTAGE(pos->ch[0] - pos->ch[1]) /
+                              MEMS_MAX_V_DIFF,
+                         vy = ANALOG_VOLTAGE(pos->ch[2] - pos->ch[3]) /
+                              MEMS_MAX_V_DIFF;
+              next_pos = mems::Position(vx, vy, pos->tag);
               // Update synchronization window
               current_sync = current_sync->conclude(next_pos);
               // Flush sync pipe if tag == 255 to prevent memory overflow

@@ -25,7 +25,7 @@ typedef struct Tracker {
   const std::string name;
   Tile *const tile;
   cv::Rect roi;
-  cv::Point2d mems_volt;
+  cv::Point2d volt;
   std::mutex lock;
   bool valid = false, updated = false;
   std::thread *thread = nullptr;
@@ -39,11 +39,10 @@ typedef struct Tracker {
     }
   }
   void update_mems_pos(const cv::Mat &img) {
-    cv::Point2d center = (roi.tl() + roi.br()) / 2.0;
-    center.x /= img.cols;
-    center.y /= img.rows;
-    auto volt = calib::cvt(calib::PtoV, center - calib::shift);
-    mems_volt = {volt.x * 180.0 - 90.0, volt.y * 180.0 - 90.0};
+    cv::Point2d pos = (roi.tl() + roi.br()) / 2.0;
+    pos.x /= img.cols;
+    pos.y /= img.rows;
+    volt = calib::pos2volt(pos);
     updated = true;
   }
 } Tracker;
@@ -61,7 +60,7 @@ std::thread pos_watcher(Context &ctx, std::vector<Tracker *> &trackers) {
           if (!(tracker->valid && tracker->updated))
             continue;
           std::unique_lock lock(tracker->lock);
-          const auto volt = tracker->mems_volt;
+          const auto volt = tracker->volt;
           lock.unlock();
           ctx.mems_pos.write({volt.x, volt.y, tracker->id});
           while (!ctx.mems_pos.empty())
@@ -353,10 +352,8 @@ void tasks::track(Context &ctx) {
             return;
           }
         }
-        auto volt = calib::cvt(calib::PtoV, tile.val - calib::shift);
-        volt.x = clamp(volt.x, 0.0, 1.0);
-        volt.y = clamp(volt.y, 0.0, 1.0);
-        auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+        auto volt = calib::pos2volt(tile.val);
+        auto pos = calib::volt2pos(volt);
         {
           std::lock_guard lock(preview->lock);
           auto s = wide->size();

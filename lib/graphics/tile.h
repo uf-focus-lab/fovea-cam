@@ -127,6 +127,7 @@ public:
   Tile &use(cv::Mat img);
   // Interaction related properties and methods
   bool is_active();
+  // Range [0.0, 1.0]
   cv::Point2d val = {0, 0};
   Tile &use(cv::Point2d &val);
   Tile &use(cv::Point2d &&val);

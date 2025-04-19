@@ -9,8 +9,8 @@ namespace mems {
 
 class Position {
 public:
-  // Value range: [-v_bias, +v_bias]
-  // Out-ranged values will be clipped to nearest boundary.
+  // Value range: [-1.0, +1.0]
+  // Out of range values will be clamped.
   double x, y;
   fcmp_field_pos field;
   Position(double x, double y, uint8_t tag = 0) : x(x), y(y) {

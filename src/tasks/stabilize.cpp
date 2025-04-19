@@ -29,8 +29,7 @@ typedef struct DispatchCmd {
 } DispatchCmd;
 
 void send(Context &ctx, cv::Point2d volt, uint8_t tag = 0) {
-  ctx.mems_pos.flush().write(
-      {volt.x * 180.0 - 90.0, volt.y * 180.0 - 90.0, tag});
+  ctx.mems_pos.flush().write({volt.x, volt.y, tag});
 }
 
 #undef LOGNAME
@@ -75,8 +74,8 @@ static inline void predict(DispatchCmd &cmd, cv::Size size, double dt,
   // Advance MEMS position based on previous ROI and velocity
   center_pred = center_raw + velocity * (dt + advance);
   // Convert to volt
-  cv::Point2d center(center_pred.x / size.width, center_pred.y / size.height);
-  cmd.volt = calib::cvt(calib::PtoV, center - calib::shift);
+  cv::Point2d pos(center_pred.x / size.width, center_pred.y / size.height);
+  cmd.volt = calib::pos2volt(pos);
   cmd.updated = true;
   std::stringstream ss;
 }
@@ -151,8 +150,7 @@ std::thread tracker(Context &ctx, DispatchCmd &cmd, double &advance,
             // Initialize tracker
             ctx.cap_wide.next(frame, true);
             ctx.cap_fovea.next(fovea, true);
-            auto volt = fovea->volt();
-            auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+            auto pos = calib::volt2pos(fovea->volt());
             roi = calib::roi(pos, frame->size(), global::config.lens.scale);
             tracker = cv::TrackerKCF::create();
             tracker->init(*frame, roi);
@@ -192,8 +190,7 @@ std::thread wide_renderer(Context &ctx, Tile &tile, DispatchCmd &user,
         disp = frame->clone();
         if (fovea != nullptr && (user.active || tracker.active)) {
           try {
-            auto volt = fovea->volt();
-            auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+            auto pos = calib::volt2pos(fovea->volt());
             auto roi =
                 calib::roi(pos, frame->size(), global::config.lens.scale);
             roi.x -= 1;
@@ -271,10 +268,7 @@ void tasks::stabilize(Context &ctx) {
           tracker_cmd.active = !active;
         }
         if (active) {
-          auto volt = calib::cvt(calib::PtoV, tile.val - calib::shift);
-          volt.x = clamp(volt.x, 0.0, 1.0);
-          volt.y = clamp(volt.y, 0.0, 1.0);
-          user.volt = volt;
+          user.volt = calib::pos2volt(tile.val);
           user.updated = true;
         }
       }),

@@ -5,6 +5,7 @@
 
 #include "GUI.h"
 #include "global.h"
+#include "mems.h"
 #include "tasks.h"
 
 #include <calib/calib.h>
@@ -31,7 +32,7 @@ std::thread matcher(Context &ctx, Tile &tile,
         //           << fmt(fovea->y, 2, 2) << ") @" << fovea->tag << std::endl;
         // Convert volt range from [-90, 90] to [0, 1]
         cv::Point2d volt = fovea->volt();
-        auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+        auto pos = calib::volt2pos(volt);
         // Get latest wide frame
         auto wide = ctx.cap_wide.read();
         if (wide == nullptr)
@@ -76,8 +77,7 @@ void calibrator(Context &ctx) {
         return;
       }
       const double scale = 1.0 / global::config.lens.scale;
-      cv::Point2d volt = fovea->volt();
-      auto pos = calib::cvt(calib::VtoP, volt) + calib::shift;
+      auto pos = calib::volt2pos(fovea->volt());
       cv::Mat canvas, kernel;
       // Step 1: scale down the fovea to match dpi with wide
       cv::cvtColor(fovea->mat, kernel, cv::COLOR_BGRA2GRAY);
@@ -160,18 +160,15 @@ void tasks::match(Context &ctx) {
   std::vector<Tile *> tiles = {
       &match_tile,
       &fovea_tile,
-      &wide_tile
-           .use(calib::cvt(calib::VtoP, {0.5, 0.5}) + calib::shift) //
+      &wide_tile.use(calib::volt2pos({0, 0}))
            .use([&ctx, &notes](Tile &tile, bool) {
-             auto pos = calib::cvt(calib::PtoV, tile.val - calib::shift);
-             pos.x = clamp(pos.x, 0.0, 1.0);
-             pos.y = clamp(pos.y, 0.0, 1.0);
-             double Vx = pos.x * 180.0 - 90.0, Vy = pos.y * 180.0 - 90.0;
+             auto const V = calib::pos2volt(tile.val);
              static uint8_t tag = 0;
-             ctx.mems_pos.flush().write({Vx, Vy, tag++});
+             ctx.mems_pos.flush().write({V.x, V.y, tag++});
              // Update notes
              std::stringstream ss;
-             ss << "V " << fmt(Vx, 2, 2) << ", " << fmt(Vy, 2, 2) << " | "
+             ss << "V " << fmt(V.x * MEMS_MAX_V_DIFF, 2, 2) << ", "
+                << fmt(V.y * MEMS_MAX_V_DIFF, 2, 2) << " | "
                 << "Z " << fmt(global::config.lens.scale, 2, 2, ' ', false)
                 << "x"
                 << " | "
