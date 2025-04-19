@@ -5,7 +5,9 @@
 #include <opencv2/opencv.hpp>
 #include <thread>
 
-#include "graphics/X11.h"
+#define __FB__ graphics::SDL2FB
+#define __FB_HEADER__ "graphics/sdl2fb.h"
+#include __FB_HEADER__
 #include "graphics/shared.h"
 #include "mems/mems.h"
 #include "threading/fast_io.h"
@@ -53,7 +55,7 @@ extern bool flag_term; // Flag to terminate entirely
 void init_signal();
 void deinit_signal();
 
-extern graphics::X11FB *fb;
+extern __FB__ *fb;
 void init_display();
 
 extern USB::SerialDevice *mems;

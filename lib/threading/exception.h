@@ -9,5 +9,6 @@
 namespace threading {
 
 class EOS : public std::exception {};
+class Timeout : public std::exception {};
 
 } // namespace threading

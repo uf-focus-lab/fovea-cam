@@ -12,27 +12,18 @@ set(CMAKE_CXX_FLAGS "-Wall -Wno-ignored-qualifiers")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # Pkg Config
+set(ENV{PKG_CONFIG_PATH} "/opt/homebrew/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libusb-1.0 REQUIRED libusb-1.0)
+pkg_check_modules(SDL2 REQUIRED sdl2)
 # Dependency Resolution
 find_package(X11 REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Spinnaker REQUIRED)
-# fetch latest argparse
-# include(FetchContent)
-# FetchContent_Declare(
-#     argparse
-#     GIT_REPOSITORY https://github.com/p-ranav/argparse.git
-# )
-# FetchContent_MakeAvailable(argparse)
-# add_compile_definitions(ARGPARSE_BUILD_TESTS=off)
-# add_compile_definitions(ARGPARSE_BUILD_SAMPLES=off)
-# set_target_properties(
-#   ARGPARSE_TESTS
-#   PROPERTIES
-#   EXCLUDE_FROM_ALL 1
-# )
+message(STATUS "SDL2_INCLUDE_DIRS = ${SDL2_INCLUDE_DIRS}")
+message(STATUS "SDL2_LIBRARY_DIRS = ${SDL2_LIBRARY_DIRS}")
+message(STATUS "SDL2_CFLAGS = ${SDL2_CFLAGS}")
 # header files and libraries
 include_directories(
   ${PROJECT_ROOT}/include/
@@ -40,11 +31,25 @@ include_directories(
   ${PROJECT_ROOT}/assets/
   ${Spinnaker_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${libusb-1.0_INCLUDE_DIRS}
+  ${SDL2_INCLUDE_DIRS}
+  ${X11_INCLUDE_DIR}
+  # MacOS
+  /opt/homebrew/include
+  /opt/X11/include
+  /usr/local/include
 )
 # Library linkables
 link_directories(
   ${Spinnaker_LIB_DIRS}
   ${OpenCV_LIB_DIRS}
+  ${libusb-1.0_LIBRARY_DIRS}
+  ${SDL2_LIBRARY_DIRS}
+  ${X11_LIB_DIR}
+  # MacOS
+  /opt/X11/lib
+  /usr/local/lib
+  /opt/homebrew/lib
 )
 # Project Local Library
 file(GLOB LIB_SRCS ${PROJECT_ROOT}/lib/*/*.cpp)
@@ -68,4 +73,5 @@ target_link_libraries(${PROJECT_NAME}
   ${OpenCV_LIBS}
   ${Spinnaker_LIBRARIES}
   ${X11_LIBRARIES}
+  ${SDL2_LIBRARIES}
 )

@@ -1,8 +1,8 @@
 #include <iostream>
 #include <opencv2/aruco.hpp>
-#include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/objdetect/aruco_dictionary.hpp>
 #include <opencv2/opencv.hpp>
 #include <sstream>
 #include <string>
@@ -167,9 +167,10 @@ cv::Mat find_aruco(ArUcoPipe &aruco_out, const cv::Mat &frame,
   // Do the detection
   std::vector<int> ids;
   std::vector<std::vector<cv::Point2f>> corners;
-  cv::Ptr<cv::aruco::Dictionary> dictionary =
+  auto const dictionary =
       cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_100);
-  cv::aruco::detectMarkers(mat, dictionary, corners, ids);
+  auto const dictionaryPtr = cv::makePtr<cv::aruco::Dictionary>(dictionary);
+  cv::aruco::detectMarkers(mat, dictionaryPtr, corners, ids);
   // if at least one marker detected
   for (unsigned i = 0; i < ids.size(); i++) {
     const int id = ids[i];

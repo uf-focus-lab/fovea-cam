@@ -143,22 +143,24 @@ public:
     return pe;
   }
 
-  ~IMPL(){
-      // if (img != NULL)
-      //   XDestroyImage(img);
-      // if (fb != NULL)
-      //   free(fb);
-      // if (gc != NULL)
-      //   XFreeGC(display, gc);
-      // if (window != 0)
-      //   XDestroyWindow(display, window);
-      // if (display != NULL)
-      //   XCloseDisplay(display);
+  ~IMPL() {
+    // if (img != NULL)
+    //   XDestroyImage(img);
+    // if (fb != NULL)
+    //   free(fb);
+    // if (gc != NULL)
+    //   XFreeGC(display, gc);
+    // if (window != 0)
+    //   XDestroyWindow(display, window);
+    // if (display != NULL)
+    //   XCloseDisplay(display);
   };
   cv::Size shape() {
     return {static_cast<int>(width), static_cast<int>(height)};
   };
-  void use(void *buffer){/* TODO */};
+  void use(void *buffer) {
+    throw std::runtime_error("X11FB does not support use(void*) method");
+  };
   void sync() {
     XPutImage(display, window, gc, img, 0, 0, 0, 0, width, height);
   };
@@ -169,7 +171,7 @@ public:
 
 namespace graphics {
 
-X11FB::X11FB() : impl(new IMPL()){};
+X11FB::X11FB() : impl(new IMPL()) {};
 
 X11FB::~X11FB() { delete (IMPL *)impl; }
 
@@ -234,8 +236,8 @@ int x11env() {
         std::cerr << LOG_NAME "Bad display path: " << file_path << std::endl;
       }
     } else {
-      std::cerr << LOG_NAME "Display not writable: "
-                << basename(file_path.c_str()) << std::endl;
+      std::cerr << LOG_NAME "Display not writable: " << file_path.c_str()
+                << std::endl;
     }
   }
   globfree(&glob_result);

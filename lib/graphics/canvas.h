@@ -3,8 +3,8 @@
 #include <sys/types.h>
 #include <vector>
 
-#include "X11.h"
-#include "graphics/shared.h"
+#include "global.h"
+#include "shared.h"
 #include "tile.h"
 
 #pragma once
@@ -60,13 +60,14 @@ public:
   Canvas &show(const cv::Mat &, cv::Rect, int transform = transform::NONE);
   // Shortcut to show tile(s)
   Canvas &show(Tile &, bool force = false, int transform = transform::NONE);
-  Canvas &show(std::vector<Tile *> &, bool force = false, int transform = transform::NONE);
+  Canvas &show(std::vector<Tile *> &, bool force = false,
+               int transform = transform::NONE);
   // Render to internal buffer without any transformation
   Canvas &render(const cv::Mat &, cv::Point pos = {0, 0},
                  int transform = transform::NONE);
   // Apply internal buffer to framebuffer
   Canvas &apply(void *, const PointerEvent *event = nullptr);
-  Canvas &apply(X11FB &fb, const PointerEvent *event = nullptr);
+  Canvas &apply(__FB__ &fb, const PointerEvent *event = nullptr);
 };
 
 } // namespace graphics

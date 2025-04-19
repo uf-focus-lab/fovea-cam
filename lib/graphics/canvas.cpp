@@ -1,6 +1,5 @@
 #include "canvas.h"
 #include "alpha.h"
-#include "graphics/X11.h"
 #include "shared.h"
 #include "util/time.h"
 
@@ -256,7 +255,7 @@ Canvas &Canvas::apply(void *fb, const PointerEvent *event) {
   return *this;
 }
 
-Canvas &Canvas::apply(X11FB &fb, const PointerEvent *event) {
+Canvas &Canvas::apply(__FB__ &fb, const PointerEvent *event) {
   apply(fb.buffer(), event);
   fb.sync();
   return *this;

@@ -4,7 +4,7 @@
 
 namespace Time {
 
-static inline std::chrono::time_point<std::chrono::system_clock> now() {
+static inline std::chrono::time_point<std::chrono::high_resolution_clock> now() {
   return std::chrono::high_resolution_clock::now();
 }
 // Get current timestamp in milliseconds
@@ -30,7 +30,7 @@ static inline unsigned long ns() {
 
 // Get current time relative to origin in milliseconds
 static inline unsigned long
-ms(std::chrono::time_point<std::chrono::system_clock> origin) {
+ms(std::chrono::time_point<std::chrono::high_resolution_clock> origin) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::high_resolution_clock::now() - origin)
       .count();
@@ -38,7 +38,7 @@ ms(std::chrono::time_point<std::chrono::system_clock> origin) {
 
 // Get current time relative to origin in nanoseconds
 static inline unsigned long
-us(std::chrono::time_point<std::chrono::system_clock> origin) {
+us(std::chrono::time_point<std::chrono::high_resolution_clock> origin) {
   return std::chrono::duration_cast<std::chrono::microseconds>(
              std::chrono::high_resolution_clock::now() - origin)
       .count();
@@ -46,7 +46,7 @@ us(std::chrono::time_point<std::chrono::system_clock> origin) {
 
 // Get current time relative to origin in nanoseconds
 static inline unsigned long
-ns(std::chrono::time_point<std::chrono::system_clock> origin) {
+ns(std::chrono::time_point<std::chrono::high_resolution_clock> origin) {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
              std::chrono::high_resolution_clock::now() - origin)
       .count();

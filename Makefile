@@ -30,6 +30,10 @@ clean:
 	@ rm -rf build
 
 init:
+	@ if [ ! -d /etc/systemd/system ]; then \
+			echo "This script is intended for Linux with systemd"; \
+			exit 1; \
+		fi
 	sudo ln -sf $(PWD)/scripts/Xorg.service /etc/systemd/system/Xorg.service
 	sudo systemctl stop gdm.service
 	sudo systemctl disable gdm.service

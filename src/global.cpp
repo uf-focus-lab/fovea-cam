@@ -49,7 +49,28 @@ inline bool cfg(std::string &line, const char *key, double &value) {
   return true;
 }
 
-static const char *CONFIG_FILE = "/etc/FoveaCam";
+std::string ensure_config_dir() {
+  const char *home = std::getenv("HOME");
+  if (!home) {
+    std::cerr << LOGNAME << "Warning: HOME environment variable is not set."
+              << std::endl
+              << "Using current working directory for config file:" << std::endl
+              << (std::getenv("PWD") || "<UNKNOWN>") << "/config.env"
+              << std::endl;
+    return "./config.env";
+  }
+  std::filesystem::path config_dir = std::string(home) + "/.config/FoveaCam";
+  if (!std::filesystem::exists(config_dir)) {
+    std::error_code ec;
+    if (!std::filesystem::create_directories(config_dir, ec)) {
+      throw std::runtime_error("Failed to create config directory: " +
+                               ec.message());
+    }
+  }
+  return (config_dir / "config.env").string();
+}
+
+std::string config_file = ensure_config_dir();
 
 namespace global {
 
@@ -84,9 +105,9 @@ const Config default_config = {
 Config config(default_config);
 
 void load_config() {
-  std::ifstream env_file(CONFIG_FILE);
+  std::ifstream env_file(config_file);
   if (!env_file) {
-    std::cerr << LOGNAME "Unable to load config from " << CONFIG_FILE << ", "
+    std::cerr << LOGNAME "Unable to load config from " << config_file << ", "
               << "using default config" << std::endl;
     return;
   }
@@ -115,13 +136,13 @@ void load_config() {
         || cfg(line, "CALIB.SHIFT.Y", calib::shift.y) //
         ;
   }
-  std::cerr << LOGNAME "Config loaded from " << CONFIG_FILE << std::endl;
+  std::cerr << LOGNAME "Config loaded from " << config_file << std::endl;
 }
 
 void save_config() {
-  std::ofstream env_file(CONFIG_FILE);
+  std::ofstream env_file(config_file);
   if (!env_file) {
-    std::cerr << LOGNAME "Unable to save config to " << CONFIG_FILE
+    std::cerr << LOGNAME "Unable to save config to " << config_file
               << std::endl;
     return;
   }
@@ -141,7 +162,7 @@ void save_config() {
            << "LENS.SCALE=" << config.lens.scale << std::endl
            << "CALIB.SHIFT.X=" << calib::shift.x << std::endl
            << "CALIB.SHIFT.Y=" << calib::shift.y << std::endl;
-  std::cerr << LOGNAME "Config written to " << CONFIG_FILE << std::endl;
+  std::cerr << LOGNAME "Config written to " << config_file << std::endl;
 }
 
 void init_signal() {
@@ -158,22 +179,22 @@ void deinit_signal() {
   signal(SIGTERM, SIG_DFL);
 }
 
-graphics::X11FB *fb = nullptr;
+__FB__ *fb = nullptr;
 
 void init_display() {
   std::cerr << "[init] Initializing display" << std::endl;
 
-  if (graphics::x11env() != 0) {
-    std::cerr << "[init] Failed to set DISPLAY environment." << std::endl;
-    std::exit(1);
-  }
+  // if (graphics::x11env() != 0) {
+  //   std::cerr << "[init] Failed to set DISPLAY environment." << std::endl;
+  //   std::exit(1);
+  // }
+  // fb = new graphics::X11FB();
+  // if (!fb->is_open()) {
+  //   std::cerr << "[init] Failed to open X11 framebuffer." << std::endl;
+  //   std::exit(1);
+  // }
 
-  fb = new graphics::X11FB();
-
-  if (!fb->is_open()) {
-    std::cerr << "[init] Failed to open X11 framebuffer." << std::endl;
-    std::exit(1);
-  }
+  fb = new __FB__("FoveaCam Duo");
 }
 
 USB::SerialDevice *mems = nullptr;
@@ -206,7 +227,7 @@ void init_devices() {
       if (model.ends_with("BFS-U3-16S2C")) {
         // wide angle camera
         wide_camera = camera;
-      } else if (model.ends_with("BFS-U3-16S2C-BD")) {
+      } else if (model.ends_with("BFS-U3-28S5C-BD")) {
         // fovea camera
         fovea_camera = camera;
       } else {

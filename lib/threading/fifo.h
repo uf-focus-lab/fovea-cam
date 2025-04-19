@@ -87,6 +87,29 @@ public:
     return data;
   }
 
+  T read(unsigned timeout_ms) {
+    std::unique_lock lock(mutex);
+    while (queue.empty() && !closed)
+      cond_w.wait_until(lock, std::chrono::steady_clock::now() +
+                                  std::chrono::milliseconds(timeout_ms));
+    if (closed) {
+      lock.unlock();
+      cond_r.notify_all();
+      throw EOS();
+    }
+    if (queue.empty()) {
+      // Timeout occurred
+      lock.unlock();
+      cond_r.notify_all();
+      throw Timeout();
+    }
+    T data = queue.front();
+    queue.pop();
+    lock.unlock();
+    cond_r.notify_all();
+    return data;
+  }
+
   void close(bool wait_empty = false) {
     std::unique_lock lock(mutex);
     if (wait_empty) {

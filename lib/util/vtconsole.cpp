@@ -1,3 +1,5 @@
+// Only for Linux
+#if defined(__linux__)
 #include <fstream>
 #include <glob.h>
 #include <iostream>
@@ -59,3 +61,4 @@ void unbind_all(bool restore_on_exit) {
 }
 
 } // namespace vtconsole
+#endif // __linux__

@@ -1,3 +1,4 @@
+#include "fb.h"
 #include "shared.h"
 
 #pragma once
@@ -6,7 +7,7 @@ namespace graphics {
 
 int x11env();
 
-class X11FB {
+class X11FB : public FB {
 private:
   void *impl;
 
