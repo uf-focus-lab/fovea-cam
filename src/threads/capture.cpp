@@ -130,7 +130,7 @@ std::thread threads::capture_wide(Context &ctx) {
       while (!global::flag_term) {
         auto tuple = cap.read();
         auto img_ptr = std::get<0>(tuple);
-        auto mat = Spinnaker::fromImagePtr(img_ptr, 1);
+        auto mat = Spinnaker::fromImagePtr(img_ptr, 0);
         out.write(mat);
       }
     }
@@ -167,7 +167,7 @@ std::thread threads::capture_fovea(Context &ctx) {
         auto tuple = cap.read();
         auto img_ptr = std::get<0>(tuple);
         auto ts = std::get<1>(tuple);
-        auto mat = Spinnaker::fromImagePtr(img_ptr, 1);
+        auto mat = Spinnaker::fromImagePtr(img_ptr, 0);
         // Find the matching sync window
         while (1) {
           if (sync_window->test(ts) <= 0)

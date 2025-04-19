@@ -7,6 +7,7 @@
 #include "graphics/shared.h"
 #include "tasks.h"
 
+#include <calib/calib.h>
 #include <graphics/canvas.h>
 #include <graphics/tile.h>
 #include <util/assert.h>
@@ -51,7 +52,7 @@ std::thread wide_renderer(Tile &tile, MatPipe &view_in, bool &zoom) {
           cv::Rect roi = {(frame->cols - w) / 2, (frame->rows - h) / 2, w, h};
           roi.x += wide_shift.x;
           roi.y += wide_shift.y;
-          tile.use((*frame)(roi));
+          tile.use(calib::view(*frame, roi));
           draw_markers(tile.mg, color::red());
         } else {
           tile.use(*frame);

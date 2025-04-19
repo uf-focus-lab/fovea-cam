@@ -41,7 +41,7 @@ std::thread matcher(Context &ctx, Tile &tile,
         // Push to pipe
         try {
           roi_out.write(roi);
-          tile.use((*wide)(roi)).raster();
+          tile.use(calib::view(*wide, roi)).raster();
         } catch (cv::Exception &e) {
           std::cerr << LOGNAME "out of bound roi: " << roi << std::endl;
         }
@@ -90,7 +90,7 @@ void calibrator(Context &ctx) {
           static_cast<int>(pos.x * static_cast<double>(wide->cols)),
           static_cast<int>(pos.y * static_cast<double>(wide->rows))};
       cv::Rect roi = {center.x, center.y, 2 * w, 2 * h};
-      canvas = canvas(roi).clone();
+      canvas = calib::view(canvas, roi).clone();
       // Step 4: Find the best match
       cv::Mat result;
       cv::matchTemplate(canvas, kernel, result, cv::TM_CCOEFF_NORMED);

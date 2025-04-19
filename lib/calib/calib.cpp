@@ -3,11 +3,14 @@
 
 using namespace calib;
 
+static const double K1 = 2.4;
+static const double C1 = 0.5 - 0.5 * K1;
+static const double K2 = 1.0 / K1;
+static const double C2 = 0.5 - 0.5 * K2;
+
 // Preloaded calibration coefficients
-Coeff calib::PtoV = {.X = {1.24970115, -0.01932751, -0.00301170, -0.11443390},
-                     .Y = {0.07596387, -1.25011547, -0.17736825, 1.13141786}},
-      calib::VtoP = {.X = {0.80072241, -0.01262265, 0.00028129, 0.10587980},
-                     .Y = {-0.04858150, -0.78664337, 0.07905642, 0.89784833}};
+Coeff calib::PtoV = {.X = {+0, K1, +0, C1}, .Y = {K1, -0, +0, C1}},
+      calib::VtoP = {.X = {+0, K2, +0, C2}, .Y = {K2, +0, +0, C2}};
 
 cv::Point2d calib::shift = {0.0, 0.0};
 
@@ -35,4 +38,35 @@ cv::Rect calib::roi(const cv::Point2d C, const cv::Size S, double z) {
   int w = static_cast<int>(static_cast<double>(W) * z),
       h = static_cast<int>(static_cast<double>(H) * z);
   return cv::Rect(clamp(x, 0, W - w), clamp(y, 0, H - h), w, h);
+}
+
+cv::Mat calib::view(const cv::Mat &src, const cv::Rect &roi) {
+  bool flag_bleed = false;
+  cv::Rect bleed(roi);
+  if (bleed.x < 0) {
+    bleed.width += bleed.x;
+    bleed.x = 0;
+    flag_bleed = true;
+  }
+  if (bleed.y < 0) {
+    bleed.height += bleed.y;
+    bleed.y = 0;
+    flag_bleed = true;
+  }
+  if (bleed.x + bleed.width > src.cols) {
+    bleed.width = src.cols - bleed.x;
+    flag_bleed = true;
+  }
+  if (bleed.y + bleed.height > src.rows) {
+    bleed.height = src.rows - bleed.y;
+    flag_bleed = true;
+  }
+  if (!flag_bleed) {
+    return src(roi);
+  } else {
+    cv::Mat result(roi.height, roi.width, src.type(), cv::Scalar(0, 0, 0, 0));
+    cv::Point offset(bleed.x - roi.x, bleed.y - roi.y);
+    src(bleed).copyTo(result(cv::Rect(offset, bleed.size())));
+    return result;
+  }
 }
