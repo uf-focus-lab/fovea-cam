@@ -93,7 +93,7 @@ unsigned char *SDL2FB::buffer() { return fb.data; }
 
 void SDL2FB::sync() {
   SDL_UpdateTexture(texture, nullptr, fb.data, fb.step[0]);
-  SDL_RenderClear(renderer);
+  // SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, nullptr, nullptr);
   SDL_RenderPresent(renderer);
 }

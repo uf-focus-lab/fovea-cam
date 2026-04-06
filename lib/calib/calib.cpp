@@ -4,7 +4,7 @@
 
 using namespace calib;
 
-static const double K1 = 1.5;
+static const double K1 = 1.7;
 static const double K2 = 1.0 / K1;
 
 // Preloaded calibration coefficients
